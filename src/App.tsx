@@ -669,7 +669,7 @@ export default function App() {
               </div>
               <span className="text-xl font-bold">Nebula</span>
             </div>
-            <div className="text-sm text-slate-400">Tech Stack Visualizer</div>
+            <div className="text-sm text-slate-400">Architecture &amp; stack studio</div>
           </header>
 
           {/* Hero */}
@@ -735,7 +735,7 @@ export default function App() {
           </main>
 
           <footer className="text-center text-sm text-slate-500 pt-8 border-t border-white/5">
-            Built for developers who present to humans
+            Nebula · built for developers who present to humans
           </footer>
         </div>
       </div>
@@ -761,7 +761,11 @@ export default function App() {
               </svg>
             </button>
             <div>
-              <div className="text-xs text-slate-500 uppercase tracking-wider">Project</div>
+              <div className="flex items-center gap-2 mb-0.5">
+                <span className="text-sm font-bold tracking-tight text-white">Nebula</span>
+                <span className="text-[10px] uppercase tracking-wider text-slate-500">Studio</span>
+              </div>
+              <div className="text-xs text-slate-500 uppercase tracking-wider">Project name</div>
               <input
                 value={projectName}
                 onChange={e => setProjectName(e.target.value)}
