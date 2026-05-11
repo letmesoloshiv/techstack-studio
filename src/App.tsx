@@ -65,6 +65,57 @@ interface ArchitectureNarrative {
   diagramProcesses?: DiagramProcessNarratives;
 }
 
+/** AI-generated SDLC recommendation */
+interface SdlcPlan {
+  method: string;
+  rationale: string;
+  cadenceAndCeremonies: string;
+  whenToRevisit: string;
+}
+
+/** Git, CI/CD, collaboration, releases */
+interface WorkflowPlan {
+  gitBranching: string;
+  ciCd: string;
+  collaboration: string;
+  releaseAndRollback: string;
+}
+
+interface RequirementsPlan {
+  scopeAndMvp: string;
+  nonFunctional: string;
+  dependenciesAndIntegrations: string;
+}
+
+interface QualityPlan {
+  testingStrategy: string;
+  environmentsAndData: string;
+  definitionOfDone: string;
+}
+
+interface SecurityPlan {
+  authnAuthz: string;
+  dataAndSecrets: string;
+  supplyChainAndCompliance: string;
+}
+
+interface PlatformPlan {
+  observability: string;
+  apiContractsAndDocs: string;
+  costAndCapacity: string;
+}
+
+interface DevPlaybook {
+  sdlc: SdlcPlan;
+  workflow: WorkflowPlan;
+  requirements: RequirementsPlan;
+  quality: QualityPlan;
+  security: SecurityPlan;
+  platform: PlatformPlan;
+}
+
+type PlaybookTabId = keyof DevPlaybook;
+
 interface AiGeneratePayload {
   stack: string[];
   explanation?: string;
@@ -74,6 +125,12 @@ interface AiGeneratePayload {
   };
   diagrams?: GeneratedDiagrams;
   visuals?: GeneratedVisuals;
+  sdlc?: Record<string, unknown>;
+  workflow?: Record<string, unknown>;
+  requirements?: Record<string, unknown>;
+  quality?: Record<string, unknown>;
+  security?: Record<string, unknown>;
+  platform?: Record<string, unknown>;
 }
 
 const DEFAULT_STACK = ['React', 'TypeScript', 'Tailwind CSS', 'Supabase', 'Vercel'];
@@ -165,6 +222,69 @@ const DIAGRAM_NARRATIVE_ORDER: { key: keyof DiagramProcessNarratives; label: str
   { key: 'useCase', label: 'Use Case' },
   { key: 'systemArchitecture', label: 'System Architecture' },
 ];
+
+const PLAYBOOK_TABS: { id: PlaybookTabId; label: string; shortLabel?: string; hint: string }[] = [
+  { id: 'sdlc', label: 'SDLC', hint: 'Methodology, cadence, and when to revisit process choices.' },
+  { id: 'workflow', label: 'Workflow', shortLabel: 'Flow', hint: 'Branching, CI/CD, collaboration, releases.' },
+  { id: 'requirements', label: 'Requirements', shortLabel: 'Reqs', hint: 'Scope, NFRs, integrations and contracts.' },
+  { id: 'quality', label: 'Quality', hint: 'Testing strategy, environments, definition of done.' },
+  { id: 'security', label: 'Security', hint: 'Auth, data, secrets, supply chain, compliance.' },
+  { id: 'platform', label: 'Platform', hint: 'Observability, API docs, cost and capacity.' },
+];
+
+function strField(obj: Record<string, unknown> | undefined, key: string): string {
+  const v = obj?.[key];
+  return typeof v === 'string' ? v.trim() : '';
+}
+
+function parseDevPlaybook(parsed: AiGeneratePayload): DevPlaybook | null {
+  const s = parsed.sdlc;
+  const w = parsed.workflow;
+  const r = parsed.requirements;
+  const q = parsed.quality;
+  const sec = parsed.security;
+  const p = parsed.platform;
+
+  const sdlc: SdlcPlan = {
+    method: strField(s, 'method'),
+    rationale: strField(s, 'rationale'),
+    cadenceAndCeremonies: strField(s, 'cadenceAndCeremonies'),
+    whenToRevisit: strField(s, 'whenToRevisit'),
+  };
+  const workflow: WorkflowPlan = {
+    gitBranching: strField(w, 'gitBranching'),
+    ciCd: strField(w, 'ciCd'),
+    collaboration: strField(w, 'collaboration'),
+    releaseAndRollback: strField(w, 'releaseAndRollback'),
+  };
+  const requirements: RequirementsPlan = {
+    scopeAndMvp: strField(r, 'scopeAndMvp'),
+    nonFunctional: strField(r, 'nonFunctional'),
+    dependenciesAndIntegrations: strField(r, 'dependenciesAndIntegrations'),
+  };
+  const quality: QualityPlan = {
+    testingStrategy: strField(q, 'testingStrategy'),
+    environmentsAndData: strField(q, 'environmentsAndData'),
+    definitionOfDone: strField(q, 'definitionOfDone'),
+  };
+  const security: SecurityPlan = {
+    authnAuthz: strField(sec, 'authnAuthz'),
+    dataAndSecrets: strField(sec, 'dataAndSecrets'),
+    supplyChainAndCompliance: strField(sec, 'supplyChainAndCompliance'),
+  };
+  const platform: PlatformPlan = {
+    observability: strField(p, 'observability'),
+    apiContractsAndDocs: strField(p, 'apiContractsAndDocs'),
+    costAndCapacity: strField(p, 'costAndCapacity'),
+  };
+
+  const blocks = [sdlc, workflow, requirements, quality, security, platform];
+  const anyContent = blocks.some((block) =>
+    Object.values(block).some((v) => v.length > 0)
+  );
+  if (!anyContent) return null;
+  return { sdlc, workflow, requirements, quality, security, platform };
+}
 
 const TECH_ALIASES: Record<string, string> = {
   nextjs: 'Next.js',
@@ -482,6 +602,8 @@ export default function App() {
   const [generatedDiagrams, setGeneratedDiagrams] = useState<GeneratedDiagrams | null>(null);
   const [generatedVisuals, setGeneratedVisuals] = useState<GeneratedVisuals | null>(null);
   const [diagramTab, setDiagramTab] = useState<'Flowchart' | 'DFD' | 'Use Case' | 'System Architecture'>('Flowchart');
+  const [devPlaybook, setDevPlaybook] = useState<DevPlaybook | null>(null);
+  const [playbookTab, setPlaybookTab] = useState<PlaybookTabId>('sdlc');
   const [theme, setTheme] = useState<'light' | 'dark'>(readStoredTheme);
 
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -779,6 +901,7 @@ export default function App() {
     setAiError('');
     setAiResult('');
     setArchitectureNarrative(null);
+    setDevPlaybook(null);
     
     const parseGeminiText = (raw: string) => {
       const t = raw.trim();
@@ -869,6 +992,10 @@ export default function App() {
           systemArchitecture: ensureVisual(parsed.visuals.systemArchitecture),
         });
       }
+
+      const playbook = parseDevPlaybook(parsed);
+      setDevPlaybook(playbook);
+      if (playbook) setPlaybookTab('sdlc');
 
       setDiagramType('Tech Stack');
     } catch (err) {
@@ -1434,7 +1561,9 @@ export default function App() {
                 </div>
                 <div>
                   <div className="text-sm font-semibold">Idea → architecture</div>
-                  <div className="text-[10px] text-slate-600 dark:text-slate-500">Stack, auth, APIs, diagrams & narrative</div>
+                  <div className="text-[10px] text-slate-600 dark:text-slate-500">
+                    Stack, SDLC, workflow, security, quality, diagrams & narrative
+                  </div>
                   <div className="mt-1 text-[10px] text-slate-600 dark:text-slate-600">
                     AI:{' '}
                     {(import.meta.env.VITE_AI_PROVIDER as string | undefined)?.trim().toLowerCase() === 'groq'
@@ -1615,6 +1744,123 @@ export default function App() {
                     ))}
                   </div>
                 </>
+              )}
+            </div>
+          </div>
+
+          {/* Engineering playbook: SDLC, workflow, and delivery tabs */}
+          <div className="col-span-12 rounded-xl border border-slate-200/90 bg-white/80 p-4 backdrop-blur-xl dark:border-white/10 dark:bg-black/30">
+            <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-500">
+              Engineering playbook
+            </div>
+            <p className="mb-3 text-[11px] leading-snug text-slate-600 dark:text-slate-500">
+              Filled by the same AI run as your architecture: methodology, how you ship, requirements, quality gates, security, and
+              platform operations.
+            </p>
+            <div className="-mx-px flex gap-1 overflow-x-auto overflow-y-hidden border-b border-slate-200/80 pb-2 scrollbar-thin touch-pan-x dark:border-white/5">
+              {PLAYBOOK_TABS.map(({ id, label, shortLabel, hint }) => (
+                <button
+                  type="button"
+                  key={id}
+                  title={hint}
+                  onClick={() => setPlaybookTab(id)}
+                  className={`shrink-0 touch-manipulation whitespace-nowrap rounded-lg px-2.5 py-2 text-xs font-medium transition sm:px-3 sm:text-sm ${
+                    playbookTab === id
+                      ? 'bg-violet-500/15 text-violet-900 dark:bg-violet-500/20 dark:text-white'
+                      : 'text-slate-800 hover:bg-slate-200/90 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-white'
+                  }`}
+                >
+                  <span className="sm:hidden">{shortLabel ?? label}</span>
+                  <span className="hidden sm:inline">{label}</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-3 min-h-[6rem] text-sm">
+              {!devPlaybook ? (
+                <p className="text-xs leading-relaxed text-slate-600 dark:text-slate-500">
+                  Run <span className="font-semibold text-slate-800 dark:text-slate-300">Idea → architecture</span> to populate SDLC
+                  method, engineering workflow, requirements, quality, security, and platform guidance tailored to your product.
+                </p>
+              ) : (
+                (() => {
+                  const t = (s: string) => (stakeholderMode && s ? firstSentences(s, 3) : s);
+                  const Para = ({ label, body }: { label: string; body: string }) =>
+                    body ? (
+                      <div className="space-y-1">
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-violet-800 dark:text-violet-300/90">
+                          {label}
+                        </div>
+                        <p className="text-xs leading-relaxed text-slate-700 dark:text-slate-300">{t(body)}</p>
+                      </div>
+                    ) : null;
+
+                  if (playbookTab === 'sdlc') {
+                    const m = devPlaybook.sdlc.method;
+                    return (
+                      <div className="space-y-3">
+                        {m ? (
+                          <div className="inline-flex items-center gap-2 rounded-lg border border-violet-200/80 bg-violet-50/90 px-3 py-1.5 dark:border-violet-500/25 dark:bg-violet-500/10">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-violet-700 dark:text-violet-300/90">
+                              Recommended SDLC
+                            </span>
+                            <span className="text-sm font-semibold text-slate-900 dark:text-white">{m}</span>
+                          </div>
+                        ) : null}
+                        <Para label="Why this method" body={devPlaybook.sdlc.rationale} />
+                        <Para label="Cadence & ceremonies" body={devPlaybook.sdlc.cadenceAndCeremonies} />
+                        <Para label="When to revisit" body={devPlaybook.sdlc.whenToRevisit} />
+                      </div>
+                    );
+                  }
+                  if (playbookTab === 'workflow') {
+                    return (
+                      <div className="space-y-3">
+                        <Para label="Git & branching" body={devPlaybook.workflow.gitBranching} />
+                        <Para label="CI / CD" body={devPlaybook.workflow.ciCd} />
+                        <Para label="Collaboration" body={devPlaybook.workflow.collaboration} />
+                        <Para label="Release & rollback" body={devPlaybook.workflow.releaseAndRollback} />
+                      </div>
+                    );
+                  }
+                  if (playbookTab === 'requirements') {
+                    return (
+                      <div className="space-y-3">
+                        <Para label="Scope & MVP" body={devPlaybook.requirements.scopeAndMvp} />
+                        <Para label="Non-functional requirements" body={devPlaybook.requirements.nonFunctional} />
+                        <Para label="Dependencies & integrations" body={devPlaybook.requirements.dependenciesAndIntegrations} />
+                      </div>
+                    );
+                  }
+                  if (playbookTab === 'quality') {
+                    return (
+                      <div className="space-y-3">
+                        <Para label="Testing strategy" body={devPlaybook.quality.testingStrategy} />
+                        <Para label="Environments & data" body={devPlaybook.quality.environmentsAndData} />
+                        <Para label="Definition of done" body={devPlaybook.quality.definitionOfDone} />
+                      </div>
+                    );
+                  }
+                  if (playbookTab === 'security') {
+                    return (
+                      <div className="space-y-3">
+                        <Para label="Authentication & authorization" body={devPlaybook.security.authnAuthz} />
+                        <Para label="Data & secrets" body={devPlaybook.security.dataAndSecrets} />
+                        <Para label="Supply chain & compliance" body={devPlaybook.security.supplyChainAndCompliance} />
+                      </div>
+                    );
+                  }
+                  if (playbookTab === 'platform') {
+                    return (
+                      <div className="space-y-3">
+                        <Para label="Observability" body={devPlaybook.platform.observability} />
+                        <Para label="API contracts & docs" body={devPlaybook.platform.apiContractsAndDocs} />
+                        <Para label="Cost & capacity" body={devPlaybook.platform.costAndCapacity} />
+                      </div>
+                    );
+                  }
+                  return null;
+                })()
               )}
             </div>
           </div>

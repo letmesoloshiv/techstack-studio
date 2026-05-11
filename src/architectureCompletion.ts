@@ -54,6 +54,56 @@ Output requirements (strict):
    - Edges must ONLY connect actor nodes to use-case nodes (simple associations). IDs must match across edges.
    Each diagram must reflect THAT diagram type (DFD ≠ flowchart ≠ use case ≠ architecture).
 
+7) "sdlc" (Software Development Life Cycle — tailor to team size, regulation, and product maturity from the idea):
+   {
+     "method": one concise label, e.g. "Scrum", "Kanban", "Scrumban", "Shape Up", "Waterfall (phase-gated)", "Hybrid",
+     "rationale": 2–4 sentences why this SDLC fits THIS product (risk, compliance, speed, discovery vs delivery),
+     "cadenceAndCeremonies": 2–4 sentences on sprint/iteration length, planning/review/retro if applicable, backlog hygiene,
+     "whenToRevisit": 1–2 sentences on signals to change methodology or tighten process
+   }
+   All four keys must be non-empty strings.
+
+8) "workflow" (how engineers ship software day to day for THIS stack and product):
+   {
+     "gitBranching": 2–3 sentences (e.g. trunk-based, GitHub Flow, Git Flow) and why,
+     "ciCd": 2–4 sentences on build, test, lint, preview deploys, production promotion,
+     "collaboration": 2–3 sentences on PRs, code review, pairing/async, docs in repo,
+     "releaseAndRollback": 2–3 sentences on versioning, feature flags, migrations, rollback
+   }
+   All four keys must be non-empty strings.
+
+9) "requirements": product/engineering requirements lens for THIS system:
+   {
+     "scopeAndMvp": 2–4 sentences on MVP vs later phases and scope boundaries,
+     "nonFunctional": 2–4 sentences on performance, availability, scalability, accessibility as relevant,
+     "dependenciesAndIntegrations": 2–3 sentences on third-party APIs, webhooks, data contracts
+   }
+   All three keys must be non-empty strings.
+
+10) "quality": testing and quality gates:
+    {
+      "testingStrategy": 2–4 sentences (unit/integration/e2e, contract tests, load as needed),
+      "environmentsAndData": 2–3 sentences on dev/stage/prod, seed data, anonymization,
+      "definitionOfDone": 2–3 sentences concrete for this team (docs, telemetry, feature flags)
+    }
+    All three keys must be non-empty strings.
+
+11) "security": security and privacy for THIS architecture:
+    {
+      "authnAuthz": 2–3 sentences aligned with chosen auth stack,
+      "dataAndSecrets": 2–3 sentences on encryption, PII, secrets management, backups,
+      "supplyChainAndCompliance": 2–3 sentences on dependencies, SBOM mindset, regulations if implied by the idea (GDPR, HIPAA, PCI, etc.)
+    }
+    All three keys must be non-empty strings.
+
+12) "platform": operations fit for a web app on this stack:
+    {
+      "observability": 2–3 sentences on logs, metrics, traces, SLOs,
+      "apiContractsAndDocs": 2–3 sentences on OpenAPI/GraphQL schema, versioning, consumer contracts,
+      "costAndCapacity": 2–3 sentences on rough cost drivers and scaling triggers
+    }
+    All three keys must be non-empty strings.
+
 Product idea:
 ${idea.trim()}`;
 }
