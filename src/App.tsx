@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { toPng } from 'html-to-image';
 import { buildArchitecturePrompt, fetchArchitectureCompletionText } from './architectureCompletion';
 import { MermaidBlock } from './MermaidBlock';
@@ -854,15 +854,18 @@ const DEMO_PLAYBOOK: DevPlaybook = {
 
 interface PreviewNode {
   id: string;
-  label: string;
-  x: number; // %
-  y: number; // %
+  title: string;
+  subtitle: string;
+  tag: string;
+  x: number; // % of canvas width
+  y: number; // % of canvas height
   color: string;
 }
 
 interface PreviewEdge {
   from: string;
   to: string;
+  label: string;
 }
 
 interface PreviewScene {
@@ -877,96 +880,180 @@ const PREVIEW_SCENES: PreviewScene[] = [
     tab: 'Tech Stack',
     caption: 'Color-coded by layer — Frontend, API, Data, Auth, Infra.',
     nodes: [
-      { id: 'react', label: 'React', x: 10, y: 30, color: '#22d3ee' },
-      { id: 'trpc', label: 'tRPC', x: 32, y: 62, color: '#818cf8' },
-      { id: 'pg', label: 'Postgres', x: 56, y: 30, color: '#34d399' },
-      { id: 'clerk', label: 'Clerk', x: 78, y: 62, color: '#fbbf24' },
-      { id: 'vercel', label: 'Vercel', x: 78, y: 14, color: '#a855f7' },
+      { id: 'react', title: 'React', subtitle: 'UI library', tag: 'Frontend', x: 4, y: 18, color: '#22d3ee' },
+      { id: 'trpc', title: 'tRPC', subtitle: 'Type-safe API', tag: 'API', x: 28, y: 58, color: '#818cf8' },
+      { id: 'pg', title: 'Postgres', subtitle: 'Primary store', tag: 'Data', x: 52, y: 18, color: '#34d399' },
+      { id: 'vercel', title: 'Vercel', subtitle: 'Edge runtime', tag: 'Infra', x: 76, y: 14, color: '#a855f7' },
+      { id: 'clerk', title: 'Clerk', subtitle: 'Identity', tag: 'Auth', x: 76, y: 58, color: '#fbbf24' },
     ],
     edges: [
-      { from: 'react', to: 'trpc' },
-      { from: 'trpc', to: 'pg' },
-      { from: 'trpc', to: 'clerk' },
-      { from: 'react', to: 'vercel' },
+      { from: 'react', to: 'trpc', label: 'calls' },
+      { from: 'trpc', to: 'pg', label: 'queries' },
+      { from: 'trpc', to: 'clerk', label: 'verifies' },
+      { from: 'react', to: 'vercel', label: 'deploys' },
     ],
   },
   {
     tab: 'Flowchart',
     caption: 'Trace a user journey from input to confirmation.',
     nodes: [
-      { id: 'open', label: 'Open', x: 6, y: 46, color: '#22d3ee' },
-      { id: 'create', label: 'Create task', x: 30, y: 22, color: '#818cf8' },
-      { id: 'save', label: 'Save', x: 54, y: 46, color: '#34d399' },
-      { id: 'audit', label: 'Audit', x: 54, y: 78, color: '#a855f7' },
-      { id: 'done', label: 'Done', x: 80, y: 46, color: '#fbbf24' },
+      { id: 'open', title: 'Open', subtitle: 'Entry point', tag: 'Step', x: 4, y: 40, color: '#22d3ee' },
+      { id: 'create', title: 'Create task', subtitle: 'Compose', tag: 'Step', x: 28, y: 8, color: '#818cf8' },
+      { id: 'save', title: 'Save', subtitle: 'Persist', tag: 'Step', x: 50, y: 40, color: '#34d399' },
+      { id: 'audit', title: 'Audit', subtitle: 'Log event', tag: 'Step', x: 50, y: 72, color: '#a855f7' },
+      { id: 'done', title: 'Done', subtitle: 'Confirm', tag: 'Step', x: 76, y: 40, color: '#fbbf24' },
     ],
     edges: [
-      { from: 'open', to: 'create' },
-      { from: 'create', to: 'save' },
-      { from: 'save', to: 'audit' },
-      { from: 'save', to: 'done' },
+      { from: 'open', to: 'create', label: 'opens' },
+      { from: 'create', to: 'save', label: 'submits' },
+      { from: 'save', to: 'audit', label: 'logs' },
+      { from: 'save', to: 'done', label: 'confirms' },
     ],
   },
   {
     tab: 'DFD',
     caption: 'Where data flows between actors, processes, and stores.',
     nodes: [
-      { id: 'user', label: 'Member', x: 6, y: 46, color: '#fbbf24' },
-      { id: 'api', label: 'API', x: 36, y: 46, color: '#818cf8' },
-      { id: 'tasks', label: 'Tasks DB', x: 70, y: 22, color: '#34d399' },
-      { id: 'audit', label: 'Audit DB', x: 70, y: 70, color: '#34d399' },
-      { id: 'ai', label: 'AI svc', x: 36, y: 14, color: '#22d3ee' },
+      { id: 'user', title: 'Member', subtitle: 'Team user', tag: 'Actor', x: 4, y: 42, color: '#fbbf24' },
+      { id: 'ai', title: 'AI svc', subtitle: 'Suggestions', tag: 'External', x: 30, y: 6, color: '#22d3ee' },
+      { id: 'api', title: 'API', subtitle: 'Task service', tag: 'Process', x: 30, y: 42, color: '#818cf8' },
+      { id: 'tasks', title: 'Tasks DB', subtitle: 'Tasks table', tag: 'Store', x: 70, y: 14, color: '#34d399' },
+      { id: 'audit', title: 'Audit DB', subtitle: 'Audit log', tag: 'Store', x: 70, y: 66, color: '#34d399' },
     ],
     edges: [
-      { from: 'user', to: 'api' },
-      { from: 'api', to: 'tasks' },
-      { from: 'api', to: 'audit' },
-      { from: 'ai', to: 'api' },
+      { from: 'user', to: 'api', label: 'request' },
+      { from: 'ai', to: 'api', label: 'suggests' },
+      { from: 'api', to: 'tasks', label: 'read/write' },
+      { from: 'api', to: 'audit', label: 'writes' },
     ],
   },
   {
     tab: 'SDLC',
     caption: 'Lifecycle, workflow, and engineering playbook included.',
     nodes: [
-      { id: 'plan', label: 'Plan', x: 8, y: 46, color: '#a855f7' },
-      { id: 'build', label: 'Build', x: 30, y: 18, color: '#818cf8' },
-      { id: 'review', label: 'Review', x: 56, y: 46, color: '#22d3ee' },
-      { id: 'demo', label: 'Demo', x: 30, y: 76, color: '#34d399' },
-      { id: 'ship', label: 'Ship', x: 80, y: 46, color: '#fbbf24' },
+      { id: 'plan', title: 'Plan', subtitle: 'Discover', tag: 'Phase', x: 4, y: 40, color: '#a855f7' },
+      { id: 'build', title: 'Build', subtitle: 'Implement', tag: 'Phase', x: 28, y: 8, color: '#818cf8' },
+      { id: 'review', title: 'Review', subtitle: 'QA & PR', tag: 'Phase', x: 50, y: 40, color: '#22d3ee' },
+      { id: 'demo', title: 'Demo', subtitle: 'Showcase', tag: 'Phase', x: 28, y: 72, color: '#34d399' },
+      { id: 'ship', title: 'Ship', subtitle: 'Release', tag: 'Phase', x: 76, y: 40, color: '#fbbf24' },
     ],
     edges: [
-      { from: 'plan', to: 'build' },
-      { from: 'build', to: 'review' },
-      { from: 'review', to: 'demo' },
-      { from: 'demo', to: 'ship' },
-      { from: 'ship', to: 'plan' },
+      { from: 'plan', to: 'build', label: 'spec' },
+      { from: 'build', to: 'review', label: 'PR' },
+      { from: 'review', to: 'demo', label: 'approved' },
+      { from: 'demo', to: 'ship', label: 'release' },
+      { from: 'ship', to: 'plan', label: 'feedback' },
     ],
   },
 ];
 
 function LandingPreview({ theme }: { theme: 'light' | 'dark' }) {
   const [scene, setScene] = useState(0);
-  const [paused, setPaused] = useState(false);
+  const [hoverPaused, setHoverPaused] = useState(false);
+  const [autoplay, setAutoplay] = useState(true);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [positions, setPositions] = useState<Record<number, Record<string, { x: number; y: number }>>>({});
+  const [centers, setCenters] = useState<Record<string, { cx: number; cy: number }>>({});
+  const [sizeKey, setSizeKey] = useState(0);
   const isDark = theme === 'dark';
 
-  useEffect(() => {
-    if (paused) return;
-    const id = window.setInterval(() => {
-      setScene((s) => (s + 1) % PREVIEW_SCENES.length);
-    }, 3400);
-    return () => window.clearInterval(id);
-  }, [paused]);
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const nodeRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const dragOffsetRef = useRef({ x: 0, y: 0 });
 
   const s = PREVIEW_SCENES[scene];
-  const nodeById = useMemo(() => Object.fromEntries(s.nodes.map((n) => [n.id, n])), [s]);
+
+  const effectivePos = (n: PreviewNode) =>
+    positions[scene]?.[n.id] ?? { x: n.x, y: n.y };
+
+  useEffect(() => {
+    if (!autoplay || hoverPaused || draggingId) return;
+    const id = window.setInterval(() => {
+      setScene((cur) => (cur + 1) % PREVIEW_SCENES.length);
+    }, 4200);
+    return () => window.clearInterval(id);
+  }, [autoplay, hoverPaused, draggingId]);
+
+  useEffect(() => {
+    if (!draggingId) return;
+    const onMove = (e: PointerEvent) => {
+      const rect = canvasRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const px = e.clientX - rect.left - dragOffsetRef.current.x;
+      const py = e.clientY - rect.top - dragOffsetRef.current.y;
+      const x = Math.max(0, Math.min(82, (px / rect.width) * 100));
+      const y = Math.max(0, Math.min(82, (py / rect.height) * 100));
+      setPositions((prev) => ({
+        ...prev,
+        [scene]: { ...(prev[scene] ?? {}), [draggingId]: { x, y } },
+      }));
+    };
+    const onUp = () => setDraggingId(null);
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+    };
+  }, [draggingId, scene]);
+
+  useEffect(() => {
+    const el = canvasRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => setSizeKey((k) => k + 1));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  useLayoutEffect(() => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect || rect.width === 0 || rect.height === 0) return;
+    const next: Record<string, { cx: number; cy: number }> = {};
+    for (const n of s.nodes) {
+      const el = nodeRefs.current[n.id];
+      if (!el) continue;
+      const r = el.getBoundingClientRect();
+      next[n.id] = {
+        cx: ((r.left + r.width / 2 - rect.left) / rect.width) * 100,
+        cy: ((r.top + r.height / 2 - rect.top) / rect.height) * 100,
+      };
+    }
+    setCenters(next);
+  }, [s, positions, sizeKey, scene]);
+
+  const handleNodePointerDown = (e: React.PointerEvent<HTMLDivElement>, nodeId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setAutoplay(false);
+    const rect = e.currentTarget.getBoundingClientRect();
+    dragOffsetRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    setDraggingId(nodeId);
+  };
+
+  const handleTabClick = (i: number) => {
+    setScene(i);
+    setAutoplay(false);
+  };
+
+  const resetScene = () => {
+    setPositions((prev) => {
+      const next = { ...prev };
+      delete next[scene];
+      return next;
+    });
+  };
+
+  const sceneHasMoves = positions[scene] && Object.keys(positions[scene]).length > 0;
 
   return (
     <div className="relative">
       <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-indigo-500/20 to-purple-500/20 blur-xl" />
       <div
         className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white/70 p-4 backdrop-blur-xl dark:border-white/10 dark:bg-black/40 sm:p-5"
-        onMouseEnter={() => setPaused(true)}
-        onMouseLeave={() => setPaused(false)}
+        onMouseEnter={() => setHoverPaused(true)}
+        onMouseLeave={() => setHoverPaused(false)}
       >
         {/* window chrome */}
         <div className="mb-3 flex items-center gap-2">
@@ -981,32 +1068,34 @@ function LandingPreview({ theme }: { theme: 'light' | 'dark' }) {
         {/* tab strip */}
         <div className="mb-3 flex gap-1 overflow-hidden rounded-lg bg-slate-100/80 p-1 dark:bg-white/5">
           {PREVIEW_SCENES.map((sc, i) => (
-            <div
+            <button
+              type="button"
               key={sc.tab}
+              onClick={() => handleTabClick(i)}
               className={`flex-1 rounded-md px-2 py-1 text-center text-[10px] font-medium transition sm:text-xs ${
                 i === scene
-                  ? 'bg-indigo-500/15 text-indigo-800 dark:bg-indigo-500/25 dark:text-white'
-                  : 'text-slate-600 dark:text-slate-400'
+                  ? 'bg-indigo-500/15 text-indigo-800 shadow-sm dark:bg-indigo-500/25 dark:text-white'
+                  : 'text-slate-600 hover:bg-slate-200/60 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-slate-200'
               }`}
             >
               {sc.tab}
-            </div>
+            </button>
           ))}
         </div>
 
         {/* canvas */}
         <div
-          key={scene}
-          className="scene-enter relative aspect-[5/3] w-full overflow-hidden rounded-lg border border-slate-200/70 bg-slate-50/70 dark:border-white/5 dark:bg-black/40"
+          ref={canvasRef}
+          className="relative aspect-[5/3] w-full touch-none select-none overflow-hidden rounded-lg border border-slate-200/70 bg-slate-50/70 dark:border-white/5 dark:bg-black/40"
         >
           {/* grid */}
-          <svg className="pointer-events-none absolute inset-0 h-full w-full opacity-40" aria-hidden>
+          <svg className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden>
             <defs>
-              <pattern id="preview-grid" width="20" height="20" patternUnits="userSpaceOnUse">
+              <pattern id="preview-grid" width="24" height="24" patternUnits="userSpaceOnUse">
                 <path
-                  d="M 20 0 L 0 0 0 20"
+                  d="M 24 0 L 0 0 0 24"
                   fill="none"
-                  stroke={isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.12)'}
+                  stroke={isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.16)'}
                 />
               </pattern>
             </defs>
@@ -1020,67 +1109,154 @@ function LandingPreview({ theme }: { theme: 'light' | 'dark' }) {
             preserveAspectRatio="none"
             aria-hidden
           >
-            {s.edges.map((e, idx) => {
-              const a = nodeById[e.from];
-              const b = nodeById[e.to];
-              if (!a || !b) return null;
-              const ax = a.x + 6;
-              const ay = a.y + 5;
-              const bx = b.x + 6;
-              const by = b.y + 5;
-              const len = Math.hypot(bx - ax, by - ay) * 2;
-              return (
-                <line
-                  key={`${scene}-${idx}`}
-                  x1={ax}
-                  y1={ay}
-                  x2={bx}
-                  y2={by}
-                  stroke={isDark ? 'rgba(165,180,252,0.85)' : 'rgba(99,102,241,0.85)'}
-                  strokeWidth={0.5}
-                  className="edge-draw"
-                  style={{ ['--edge-len' as string]: String(len) }}
-                  strokeLinecap="round"
+            <defs>
+              <filter id="preview-edge-shadow" x="-30%" y="-30%" width="160%" height="160%">
+                <feDropShadow
+                  dx="0"
+                  dy="0"
+                  stdDeviation={isDark ? 0.35 : 0.55}
+                  floodColor={isDark ? '#0a0b10' : '#64748b'}
+                  floodOpacity={isDark ? 0.95 : 0.45}
                 />
+              </filter>
+            </defs>
+            {s.edges.map((e, idx) => {
+              const a = centers[e.from];
+              const b = centers[e.to];
+              if (!a || !b) return null;
+              const fromNode = s.nodes.find((n) => n.id === e.from);
+              const toNode = s.nodes.find((n) => n.id === e.to);
+              if (!fromNode || !toNode) return null;
+              const colorFrom = edgeStrokeColor(fromNode.color, !isDark);
+              const colorTo = edgeStrokeColor(toNode.color, !isDark);
+              const gradId = svgEdgeGradientId(`preview-${s.tab}`, idx, e.from, e.to);
+              const midX = (a.cx + b.cx) / 2;
+              const midY = (a.cy + b.cy) / 2;
+              const spiralR = 1.4 + (idx % 4) * 0.5;
+              const spiralA = ((idx * 53) % 360) * (Math.PI / 180);
+              const lx = midX + Math.cos(spiralA) * spiralR;
+              const ly = midY + Math.sin(spiralA) * spiralR;
+              return (
+                <g key={`${scene}-edge-${idx}-${e.from}-${e.to}`}>
+                  <defs>
+                    <linearGradient
+                      id={gradId}
+                      gradientUnits="userSpaceOnUse"
+                      x1={a.cx}
+                      y1={a.cy}
+                      x2={b.cx}
+                      y2={b.cy}
+                    >
+                      <stop offset="0%" stopColor={colorFrom} stopOpacity={0.95} />
+                      <stop offset="100%" stopColor={colorTo} stopOpacity={0.95} />
+                    </linearGradient>
+                  </defs>
+                  <path
+                    d={`M ${a.cx} ${a.cy} Q ${(a.cx + b.cx) / 2} ${a.cy + 6}, ${b.cx} ${b.cy}`}
+                    fill="none"
+                    stroke={`url(#${gradId})`}
+                    strokeWidth={isDark ? 0.5 : 0.6}
+                    strokeLinecap="round"
+                  />
+                  <text
+                    x={lx}
+                    y={ly}
+                    fill={isDark ? 'rgba(226,232,240,0.95)' : '#0f172a'}
+                    stroke={isDark ? '#0a0b10' : '#ffffff'}
+                    strokeWidth={isDark ? 0.5 : 0.7}
+                    paintOrder="stroke fill"
+                    fontSize="1.6"
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    filter="url(#preview-edge-shadow)"
+                  >
+                    {e.label}
+                  </text>
+                </g>
               );
             })}
           </svg>
 
           {/* nodes */}
-          {s.nodes.map((n, i) => (
-            <div
-              key={`${scene}-${n.id}`}
-              className="scene-enter absolute rounded-md border px-2 py-1 text-[10px] font-semibold shadow-sm backdrop-blur-sm sm:text-xs"
-              style={{
-                left: `${n.x}%`,
-                top: `${n.y}%`,
-                animationDelay: `${100 + i * 70}ms`,
-                borderColor: isDark ? `${n.color}66` : `${n.color}aa`,
-                background: isDark
-                  ? `linear-gradient(135deg, ${n.color}22, rgba(0,0,0,0.55))`
-                  : `linear-gradient(135deg, ${n.color}33, rgba(255,255,255,0.92))`,
-                color: isDark ? '#e2e8f0' : '#0f172a',
-                boxShadow: isDark ? `0 0 16px -8px ${n.color}` : `0 6px 16px -8px ${n.color}aa`,
-              }}
-            >
-              {n.label}
-            </div>
-          ))}
+          {s.nodes.map((n, i) => {
+            const pos = effectivePos(n);
+            const isDragging = draggingId === n.id;
+            return (
+              <div
+                key={`${scene}-${n.id}`}
+                ref={(el) => {
+                  nodeRefs.current[n.id] = el;
+                }}
+                onPointerDown={(e) => handleNodePointerDown(e, n.id)}
+                className={`scene-enter absolute flex w-[5.5rem] cursor-grab select-none flex-col gap-0.5 rounded-lg border px-1.5 py-1.5 backdrop-blur-sm transition-shadow active:cursor-grabbing hover:shadow-lg sm:w-[6.25rem] ${
+                  isDragging ? 'z-30 shadow-2xl' : 'z-10'
+                }`}
+                style={{
+                  left: `${pos.x}%`,
+                  top: `${pos.y}%`,
+                  animationDelay: `${100 + i * 70}ms`,
+                  borderColor: isDark ? `${n.color}66` : `${n.color}cc`,
+                  background: isDark
+                    ? `linear-gradient(135deg, ${n.color}1f, rgba(0,0,0,0.6))`
+                    : `linear-gradient(135deg, ${n.color}24, rgba(255,255,255,0.94))`,
+                  boxShadow: isDark ? `0 0 22px -10px ${n.color}` : `0 6px 18px -8px ${n.color}99`,
+                  touchAction: 'none',
+                }}
+              >
+                <span
+                  className="self-start rounded px-1 py-px text-[7px] font-bold uppercase leading-none tracking-wider sm:text-[8px]"
+                  style={nodeTagChipStyle(n.color, isDark)}
+                >
+                  {n.tag}
+                </span>
+                <div
+                  className="text-[10px] font-semibold leading-tight sm:text-[11px]"
+                  style={{ color: nodeTextColor(n.color, isDark) }}
+                >
+                  {n.title}
+                </div>
+                <div className="text-[8px] leading-tight text-slate-600 dark:text-slate-500 sm:text-[9px]">
+                  {n.subtitle}
+                </div>
+              </div>
+            );
+          })}
+
+          {/* drag hint */}
+          <div className="pointer-events-none absolute bottom-1.5 right-2 hidden text-[9px] font-medium uppercase tracking-wider text-slate-500/80 dark:text-slate-500/80 sm:block">
+            drag nodes · click tabs
+          </div>
         </div>
 
         {/* caption */}
         <div className="mt-3 flex items-center gap-2">
-          <div className="flex gap-1">
-            {PREVIEW_SCENES.map((_, i) => (
-              <span
-                key={i}
+          <div className="flex items-center gap-1">
+            {PREVIEW_SCENES.map((sc, i) => (
+              <button
+                key={sc.tab}
+                type="button"
+                onClick={() => handleTabClick(i)}
+                aria-label={`Show ${sc.tab}`}
                 className={`h-1.5 rounded-full transition-all ${
-                  i === scene ? 'w-6 bg-indigo-500 dark:bg-indigo-400' : 'w-1.5 bg-slate-300 dark:bg-white/15'
+                  i === scene
+                    ? 'w-6 bg-indigo-500 dark:bg-indigo-400'
+                    : 'w-1.5 bg-slate-300 hover:bg-slate-400 dark:bg-white/15 dark:hover:bg-white/25'
                 }`}
               />
             ))}
           </div>
-          <p className="text-[11px] leading-snug text-slate-600 dark:text-slate-400 sm:text-xs">{s.caption}</p>
+          <p className="flex-1 text-[11px] leading-snug text-slate-600 dark:text-slate-400 sm:text-xs">
+            {s.caption}
+          </p>
+          {sceneHasMoves ? (
+            <button
+              type="button"
+              onClick={resetScene}
+              className="rounded-md px-1.5 py-0.5 text-[10px] font-medium text-indigo-700 hover:bg-indigo-500/10 dark:text-indigo-300"
+            >
+              Reset
+            </button>
+          ) : null}
         </div>
       </div>
     </div>
