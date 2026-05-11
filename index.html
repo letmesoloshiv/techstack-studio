@@ -3,12 +3,26 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5"
+    />
     <meta
       name="description"
       content="Nebula — visualize tech stacks, generate architecture with AI, and export diagrams."
     />
     <title>Nebula — architecture &amp; stack studio</title>
+    <script>
+      (function () {
+        try {
+          var s = localStorage.getItem('nebula-theme');
+          var dark =
+            s === 'dark' ||
+            (s !== 'light' && !window.matchMedia('(prefers-color-scheme: light)').matches);
+          document.documentElement.classList.toggle('dark', dark);
+        } catch (_) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

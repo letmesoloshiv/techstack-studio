@@ -21,20 +21,38 @@ Output requirements (strict):
      "headline": short title for the architecture,
      "summary": 3–5 sentences explaining how the pieces work together for THIS product idea,
      "byLayer": object with optional keys "Frontend","API","Data","Auth","Infra" — each value is 1–3 sentences on choices and responsibilities for that layer,
-     "diagramOverview": 2–4 sentences describing how the four diagrams below relate to the system
+     "diagramOverview": 2–4 sentences describing how the four diagrams below relate to one another and to the product,
+     "diagramProcesses": (required for the in-app Architecture Narrative — explain each diagram’s process in plain language):
+     {
+       "flowchart": "2–4 sentences: what end-to-end process or user journey the flowchart shows, the main steps/decisions, and how to read the diagram.",
+       "dfd": "2–4 sentences: what processes, data stores, and external entities represent here and how data moves between them for this system.",
+       "useCase": "2–4 sentences: who the actors are, which use cases matter for the product, and how the diagram reflects user–system interactions.",
+       "systemArchitecture": "2–4 sentences: major runtime components, how they connect, and what structural view this diagram emphasizes."
+     }
+     Always include all four keys with non-empty strings.
    }
 4) "explanation": one or two punchy sentences (shown in the UI compactly).
 5) "diagrams": {
      "flowchart": valid Mermaid flowchart (flowchart TD) for main user/system process,
      "dfd": valid Mermaid for a data-flow style (use flowchart LR or flowchart TD with clear processes, data stores, external entities; label flows),
-     "useCase": Mermaid diagram for use cases (use caseDiagram syntax if possible, else flowchart that lists actors and use cases),
+     "useCase": Classic UML-style Mermaid use case diagram:
+       - use \`usecaseDiagram\` syntax.
+       - Declare actors OUTSIDE the system (e.g. \`actor "Visitor"\`, \`actor "Admin"\`).
+       - Wrap all use cases in \`package "«System name»" { ... }\` (the package is the system boundary rectangle; use a short product/system title).
+       - List use cases inside the package as verb phrases in ovals, e.g. \`(Place Order)\`, \`(Cancel Order)\`.
+       - Connect actors to use cases only with \`-->\` association lines (labels optional, usually omit for simple associations).
+       - Do NOT connect actors directly to each other. Do NOT nest actors inside the package.
      "systemArchitecture": Mermaid diagram for components (flowchart or C4-style blocks) showing clients, services, data stores, and integrations
    }
 6) "visuals": For interactive canvas graphs, for EACH key flowchart, dfd, useCase, systemArchitecture provide:
    { "nodes": [ { "id", "label", "kind" } ], "edges": [ { "from", "to", "label" } ] }
    Use 5–9 nodes per diagram. "kind" should reflect semantics (actor, process, datastore, external, service, client, api, integration).
-   For useCase visuals, human actors MUST use kind "actor" (or "human actor") so the UI can render a stick-figure actor; use cases remain other kinds.
-   IDs must match across edges. Each diagram must reflect THAT diagram type (DFD ≠ flowchart ≠ use case ≠ architecture).
+   For useCase visuals specifically, follow textbook UML layout semantics (Moqups-style):
+   - Include exactly ONE node with kind "system boundary" (or "boundary") whose label is the short system/product name (e.g. "Online Store"). This node is the boundary only — do NOT attach edges to it.
+   - Include one node per human actor with kind "actor" or "human actor"; labels like Visitor, Customer, Admin as appropriate to the product.
+   - Include one node per use case with kind "use case"; labels are short verb phrases (e.g. "Place Order", "Update Products").
+   - Edges must ONLY connect actor nodes to use-case nodes (simple associations). IDs must match across edges.
+   Each diagram must reflect THAT diagram type (DFD ≠ flowchart ≠ use case ≠ architecture).
 
 Product idea:
 ${idea.trim()}`;
