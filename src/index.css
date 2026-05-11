@@ -91,6 +91,48 @@ html.dark body {
   }
 }
 
+@keyframes scene-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes edge-draw {
+  from {
+    stroke-dashoffset: var(--edge-len, 200);
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes tour-ring {
+  0%, 100% {
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.55), 0 0 0 12px rgba(99, 102, 241, 0.18);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(99, 102, 241, 0.8), 0 0 0 18px rgba(99, 102, 241, 0.05);
+  }
+}
+
+.scene-enter {
+  animation: scene-in 480ms ease-out both;
+}
+
+.edge-draw {
+  stroke-dasharray: var(--edge-len, 200);
+  animation: edge-draw 900ms ease-out both;
+}
+
+.tour-ring {
+  animation: tour-ring 1.6s ease-in-out infinite;
+}
+
 input, textarea, select {
   font-family: inherit;
 }

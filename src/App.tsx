@@ -607,6 +607,634 @@ function makeNodes(stack: string[]): TechNode[] {
     .sort((a, b) => CATEGORY_ORDER.indexOf(a.category) - CATEGORY_ORDER.indexOf(b.category));
 }
 
+/* ────────────────────────────────────────────────────────────────────────── */
+/*  Demo dataset — used by the "Try Demo" tour so the studio is fully filled  */
+/*  without calling any AI provider.                                          */
+/* ────────────────────────────────────────────────────────────────────────── */
+
+const DEMO_PROJECT_NAME = 'TaskPilot';
+
+const DEMO_STACK: string[] = [
+  'React',
+  'TypeScript',
+  'Tailwind CSS',
+  'Node',
+  'tRPC',
+  'PostgreSQL',
+  'Prisma',
+  'Clerk',
+  'Vercel',
+  'Sentry',
+];
+
+const DEMO_SYSTEM_IDEA =
+  'A task tracker for small teams. Members create work, get AI suggestions on next steps, and sync deadlines with calendars. Needs SSO, audit logs, low-latency sync, and SOC2-friendly logging.';
+
+const DEMO_AI_RESULT =
+  'TaskPilot — a tRPC + Postgres SaaS with Clerk SSO, optimistic React UI, and Sentry-backed observability on Vercel.';
+
+const DEMO_NARRATIVE: ArchitectureNarrative = {
+  headline: 'TaskPilot — collaborative AI task manager',
+  summary:
+    'Small teams plan work in a real-time React UI backed by a typed tRPC layer on Node. Postgres via Prisma stores tasks, projects, and audit events; Clerk owns identity and SSO. Vercel hosts edge-deployed pages and serverless API routes; Sentry captures errors and slow traces in production.',
+  byLayer: {
+    Frontend:
+      'React + TypeScript + Tailwind for fast iteration on the UI. Query patterns over tRPC give optimistic updates while staying type-safe end to end.',
+    API:
+      'A tRPC layer over Node handlers groups procedures by domain (projects, tasks, AI). Auth context is injected from Clerk-issued JWTs; each procedure validates with Zod schemas.',
+    Data:
+      'Postgres on a managed provider, accessed through Prisma. Schema covers Users, Workspaces, Projects, Tasks, Comments, AuditEvents. Soft-deletes and per-row workspace IDs enable multi-tenant isolation.',
+    Auth:
+      'Clerk handles signup, social SSO, and session refresh. Workspace roles (owner/admin/member/viewer) are enforced on the API in tRPC middleware.',
+    Infra:
+      'Vercel deploys both the SPA and serverless tRPC routes globally. Sentry tracks errors and performance across both halves. GitHub Actions runs CI gates on PRs.',
+  },
+  diagramOverview:
+    'Tabs trace the same product from different lenses: Flowchart shows the create-task journey, DFD highlights where data moves, Use Case captures the core actor flows, and System Architecture shows the deployment topology.',
+  diagramProcesses: {
+    flowchart:
+      'A user creates a task → React form posts via tRPC → Node validates with Zod → Prisma writes to Postgres → audit event emitted → optimistic UI confirms.',
+    dfd:
+      'Members push task input into the API process, which reads/writes the Tasks store and emits AuditEvents to the audit store; the AI suggestions service reads task context and returns enrichment.',
+    useCase:
+      'Primary actor "Member" performs Create Task, Comment, Mark Done, and Request AI Suggestion inside the TaskPilot system boundary; "Admin" additionally performs Manage Workspace.',
+    systemArchitecture:
+      'Clients connect to Vercel Edge → tRPC routes (Node) → Postgres (Prisma) and Clerk for auth → Sentry sinks errors and traces.',
+  },
+};
+
+const DEMO_DIAGRAMS: GeneratedDiagrams = {
+  flowchart: `flowchart TD
+  A[User opens TaskPilot] --> B[Create new task]
+  B --> C{Valid input?}
+  C -- Yes --> D[tRPC mutation]
+  D --> E[Prisma → Postgres]
+  E --> F[Emit AuditEvent]
+  F --> G[Optimistic UI update]
+  C -- No --> H[Inline validation message]`,
+  dfd: `flowchart LR
+  M((Member)) -->|task input| P[API process]
+  P -->|read/write| TS[(Tasks store)]
+  P -->|append| AE[(Audit events)]
+  AI[/AI Suggestions svc/] -->|enrich| P
+  P -->|response| M`,
+  useCase: `flowchart LR
+  M((Member)) --- UC1((Create Task))
+  M --- UC2((Mark Done))
+  M --- UC3((Request AI Suggestion))
+  A((Admin)) --- UC4((Manage Workspace))
+  A --- UC1
+  subgraph TaskPilot
+    UC1
+    UC2
+    UC3
+    UC4
+  end`,
+  systemArchitecture: `flowchart TB
+  subgraph Edge[Vercel Edge]
+    UI[React SPA]
+  end
+  subgraph API[Vercel Serverless]
+    T[tRPC routes]
+  end
+  subgraph Data[Managed Postgres]
+    DB[(Postgres + Prisma)]
+  end
+  Clerk[(Clerk Identity)]
+  Sentry[(Sentry)]
+  UI --> T
+  T --> DB
+  T --> Clerk
+  UI --> Sentry
+  T --> Sentry`,
+};
+
+const DEMO_VISUALS: GeneratedVisuals = {
+  flowchart: {
+    nodes: [
+      { id: 'open', label: 'Open TaskPilot', kind: 'process' },
+      { id: 'create', label: 'Create task', kind: 'process' },
+      { id: 'rpc', label: 'tRPC mutation', kind: 'api' },
+      { id: 'db', label: 'Postgres write', kind: 'data store' },
+      { id: 'audit', label: 'Audit event', kind: 'data store' },
+      { id: 'ui', label: 'Optimistic UI', kind: 'process' },
+    ],
+    edges: [
+      { from: 'open', to: 'create', label: 'opens form' },
+      { from: 'create', to: 'rpc', label: 'submit' },
+      { from: 'rpc', to: 'db', label: 'persist' },
+      { from: 'db', to: 'audit', label: 'emit' },
+      { from: 'audit', to: 'ui', label: 'confirm' },
+    ],
+  },
+  dfd: {
+    nodes: [
+      { id: 'mem', label: 'Member', kind: 'external actor' },
+      { id: 'api', label: 'API process', kind: 'process' },
+      { id: 'ts', label: 'Tasks store', kind: 'data store' },
+      { id: 'ae', label: 'Audit events', kind: 'data store' },
+      { id: 'ai', label: 'AI suggestions', kind: 'external service' },
+    ],
+    edges: [
+      { from: 'mem', to: 'api', label: 'task input' },
+      { from: 'api', to: 'ts', label: 'read/write' },
+      { from: 'api', to: 'ae', label: 'append' },
+      { from: 'ai', to: 'api', label: 'enrich' },
+      { from: 'api', to: 'mem', label: 'response' },
+    ],
+  },
+  useCase: {
+    nodes: [
+      { id: 'mem', label: 'Member', kind: 'actor' },
+      { id: 'adm', label: 'Admin', kind: 'actor' },
+      { id: 'sys', label: 'TaskPilot', kind: 'system boundary' },
+      { id: 'uc1', label: 'Create Task', kind: 'use case' },
+      { id: 'uc2', label: 'Mark Done', kind: 'use case' },
+      { id: 'uc3', label: 'Request AI Suggestion', kind: 'use case' },
+      { id: 'uc4', label: 'Manage Workspace', kind: 'use case' },
+    ],
+    edges: [
+      { from: 'mem', to: 'uc1', label: 'creates' },
+      { from: 'mem', to: 'uc2', label: 'completes' },
+      { from: 'mem', to: 'uc3', label: 'requests' },
+      { from: 'adm', to: 'uc1', label: 'creates' },
+      { from: 'adm', to: 'uc4', label: 'manages' },
+    ],
+  },
+  systemArchitecture: {
+    nodes: [
+      { id: 'spa', label: 'React SPA', kind: 'frontend' },
+      { id: 'api', label: 'tRPC routes', kind: 'api' },
+      { id: 'db', label: 'Postgres', kind: 'data store' },
+      { id: 'clerk', label: 'Clerk Identity', kind: 'external service' },
+      { id: 'sentry', label: 'Sentry', kind: 'external service' },
+    ],
+    edges: [
+      { from: 'spa', to: 'api', label: 'tRPC' },
+      { from: 'api', to: 'db', label: 'Prisma' },
+      { from: 'api', to: 'clerk', label: 'verify JWT' },
+      { from: 'spa', to: 'sentry', label: 'errors' },
+      { from: 'api', to: 'sentry', label: 'traces' },
+    ],
+  },
+};
+
+const DEMO_PLAYBOOK: DevPlaybook = {
+  sdlc: {
+    method: 'Lean Scrum (2-week sprints)',
+    rationale:
+      'Small team iterating on UX with regular customer feedback. Sprints keep planning lightweight while shipping on a predictable cadence.',
+    cadenceAndCeremonies:
+      'Planning Monday week 1, mid-sprint review Friday week 1, demo + retro Friday week 2. Daily 10-minute async standup in Slack.',
+    whenToRevisit:
+      'Move toward Kanban if work becomes interrupt-driven (incidents, support) or scale Scrum-of-Scrums when the team passes ~10 engineers.',
+    diagram: `flowchart LR
+  Plan[Sprint planning] --> Build[Build]
+  Build --> Review[Mid-sprint review]
+  Review --> Build
+  Build --> Demo[Demo + retro]
+  Demo --> Plan`,
+  },
+  workflow: {
+    gitBranching:
+      'Trunk-based with short-lived feature branches; merge to main behind feature flags. Squash-merge with conventional commit titles.',
+    ciCd:
+      'GitHub Actions: lint + typecheck + unit + e2e on every PR. Preview deploys on Vercel for each PR; main auto-deploys to production.',
+    collaboration:
+      'PRs require one review and green CI. ADRs in /docs/adr for architectural changes. Linear for ticketing, linked from PR body.',
+    releaseAndRollback:
+      'Vercel instant rollback on regressions. Feature flags toggle risky changes. Postmortems within 48 hours.',
+    diagram: `flowchart LR
+  Dev[Developer] --> PR[Open PR]
+  PR --> CI[GitHub Actions CI]
+  CI --> Preview[Vercel preview]
+  Preview --> Review[Code review]
+  Review --> Main[Merge to main]
+  Main --> Prod[Vercel production]
+  Prod --> Sentry[Sentry observability]`,
+  },
+  requirements: {
+    scopeAndMvp:
+      'MVP: workspaces, tasks, comments, AI suggestions, SSO. Out of scope for v1: Gantt charts, custom workflows, native mobile apps.',
+    nonFunctional:
+      'P95 task save < 250 ms; 99.9% monthly availability; SOC2-friendly audit logs; encryption at rest and in transit.',
+    dependenciesAndIntegrations:
+      'Clerk for auth, OpenAI-compatible API for suggestions, Google/Microsoft calendar sync, Slack notifications.',
+  },
+  quality: {
+    testingStrategy:
+      'Unit tests on tRPC procedures with Vitest; component tests via React Testing Library; Playwright for the create-task and SSO journeys.',
+    environmentsAndData:
+      'Dev / preview / prod environments. Preview branches use a sanitized seed DB. PII is never copied to lower environments.',
+    definitionOfDone:
+      'Code reviewed, tests added, telemetry emitted, ADR written if architectural, docs updated, feature flag plan agreed.',
+  },
+  security: {
+    authnAuthz:
+      'Clerk for identity; tRPC middleware enforces workspace-scoped roles. JWTs verified on every request with short TTL and refresh tokens.',
+    dataAndSecrets:
+      'Secrets in Vercel + GitHub OIDC; Postgres TLS-only; row-level workspace isolation; audit log export to S3 with lifecycle policies.',
+    supplyChainAndCompliance:
+      'Renovate + Dependabot for updates; SBOM generated on release; SOC2 controls tracked in a dedicated compliance tool.',
+  },
+  platform: {
+    observability:
+      'Sentry for errors and performance; structured logs to Vercel + a log aggregator; SLO dashboard reviewed weekly.',
+    apiContractsAndDocs:
+      'tRPC schemas are the source of truth; generated TS types shared with the SPA; OpenAPI mirror published for partner integrations.',
+    costAndCapacity:
+      'Vercel Pro tier; Postgres 4 vCPU plan with read replica past 80% utilization; AI cost capped per workspace via quota.',
+  },
+};
+
+/* ────────────────────────────────────────────────────────────────────────── */
+/*  Animated landing preview — a tiny "studio" mock that cycles through       */
+/*  diagram types so the hero communicates what the app actually does.        */
+/* ────────────────────────────────────────────────────────────────────────── */
+
+interface PreviewNode {
+  id: string;
+  label: string;
+  x: number; // %
+  y: number; // %
+  color: string;
+}
+
+interface PreviewEdge {
+  from: string;
+  to: string;
+}
+
+interface PreviewScene {
+  tab: 'Tech Stack' | 'Flowchart' | 'DFD' | 'SDLC';
+  caption: string;
+  nodes: PreviewNode[];
+  edges: PreviewEdge[];
+}
+
+const PREVIEW_SCENES: PreviewScene[] = [
+  {
+    tab: 'Tech Stack',
+    caption: 'Color-coded by layer — Frontend, API, Data, Auth, Infra.',
+    nodes: [
+      { id: 'react', label: 'React', x: 10, y: 30, color: '#22d3ee' },
+      { id: 'trpc', label: 'tRPC', x: 32, y: 62, color: '#818cf8' },
+      { id: 'pg', label: 'Postgres', x: 56, y: 30, color: '#34d399' },
+      { id: 'clerk', label: 'Clerk', x: 78, y: 62, color: '#fbbf24' },
+      { id: 'vercel', label: 'Vercel', x: 78, y: 14, color: '#a855f7' },
+    ],
+    edges: [
+      { from: 'react', to: 'trpc' },
+      { from: 'trpc', to: 'pg' },
+      { from: 'trpc', to: 'clerk' },
+      { from: 'react', to: 'vercel' },
+    ],
+  },
+  {
+    tab: 'Flowchart',
+    caption: 'Trace a user journey from input to confirmation.',
+    nodes: [
+      { id: 'open', label: 'Open', x: 6, y: 46, color: '#22d3ee' },
+      { id: 'create', label: 'Create task', x: 30, y: 22, color: '#818cf8' },
+      { id: 'save', label: 'Save', x: 54, y: 46, color: '#34d399' },
+      { id: 'audit', label: 'Audit', x: 54, y: 78, color: '#a855f7' },
+      { id: 'done', label: 'Done', x: 80, y: 46, color: '#fbbf24' },
+    ],
+    edges: [
+      { from: 'open', to: 'create' },
+      { from: 'create', to: 'save' },
+      { from: 'save', to: 'audit' },
+      { from: 'save', to: 'done' },
+    ],
+  },
+  {
+    tab: 'DFD',
+    caption: 'Where data flows between actors, processes, and stores.',
+    nodes: [
+      { id: 'user', label: 'Member', x: 6, y: 46, color: '#fbbf24' },
+      { id: 'api', label: 'API', x: 36, y: 46, color: '#818cf8' },
+      { id: 'tasks', label: 'Tasks DB', x: 70, y: 22, color: '#34d399' },
+      { id: 'audit', label: 'Audit DB', x: 70, y: 70, color: '#34d399' },
+      { id: 'ai', label: 'AI svc', x: 36, y: 14, color: '#22d3ee' },
+    ],
+    edges: [
+      { from: 'user', to: 'api' },
+      { from: 'api', to: 'tasks' },
+      { from: 'api', to: 'audit' },
+      { from: 'ai', to: 'api' },
+    ],
+  },
+  {
+    tab: 'SDLC',
+    caption: 'Lifecycle, workflow, and engineering playbook included.',
+    nodes: [
+      { id: 'plan', label: 'Plan', x: 8, y: 46, color: '#a855f7' },
+      { id: 'build', label: 'Build', x: 30, y: 18, color: '#818cf8' },
+      { id: 'review', label: 'Review', x: 56, y: 46, color: '#22d3ee' },
+      { id: 'demo', label: 'Demo', x: 30, y: 76, color: '#34d399' },
+      { id: 'ship', label: 'Ship', x: 80, y: 46, color: '#fbbf24' },
+    ],
+    edges: [
+      { from: 'plan', to: 'build' },
+      { from: 'build', to: 'review' },
+      { from: 'review', to: 'demo' },
+      { from: 'demo', to: 'ship' },
+      { from: 'ship', to: 'plan' },
+    ],
+  },
+];
+
+function LandingPreview({ theme }: { theme: 'light' | 'dark' }) {
+  const [scene, setScene] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const isDark = theme === 'dark';
+
+  useEffect(() => {
+    if (paused) return;
+    const id = window.setInterval(() => {
+      setScene((s) => (s + 1) % PREVIEW_SCENES.length);
+    }, 3400);
+    return () => window.clearInterval(id);
+  }, [paused]);
+
+  const s = PREVIEW_SCENES[scene];
+  const nodeById = useMemo(() => Object.fromEntries(s.nodes.map((n) => [n.id, n])), [s]);
+
+  return (
+    <div className="relative">
+      <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-indigo-500/20 to-purple-500/20 blur-xl" />
+      <div
+        className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white/70 p-4 backdrop-blur-xl dark:border-white/10 dark:bg-black/40 sm:p-5"
+        onMouseEnter={() => setPaused(true)}
+        onMouseLeave={() => setPaused(false)}
+      >
+        {/* window chrome */}
+        <div className="mb-3 flex items-center gap-2">
+          <div className="h-3 w-3 rounded-full bg-red-400/60" />
+          <div className="h-3 w-3 rounded-full bg-yellow-400/60" />
+          <div className="h-3 w-3 rounded-full bg-green-400/60" />
+          <div className="ml-auto text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-500">
+            Nebula Studio
+          </div>
+        </div>
+
+        {/* tab strip */}
+        <div className="mb-3 flex gap-1 overflow-hidden rounded-lg bg-slate-100/80 p-1 dark:bg-white/5">
+          {PREVIEW_SCENES.map((sc, i) => (
+            <div
+              key={sc.tab}
+              className={`flex-1 rounded-md px-2 py-1 text-center text-[10px] font-medium transition sm:text-xs ${
+                i === scene
+                  ? 'bg-indigo-500/15 text-indigo-800 dark:bg-indigo-500/25 dark:text-white'
+                  : 'text-slate-600 dark:text-slate-400'
+              }`}
+            >
+              {sc.tab}
+            </div>
+          ))}
+        </div>
+
+        {/* canvas */}
+        <div
+          key={scene}
+          className="scene-enter relative aspect-[5/3] w-full overflow-hidden rounded-lg border border-slate-200/70 bg-slate-50/70 dark:border-white/5 dark:bg-black/40"
+        >
+          {/* grid */}
+          <svg className="pointer-events-none absolute inset-0 h-full w-full opacity-40" aria-hidden>
+            <defs>
+              <pattern id="preview-grid" width="20" height="20" patternUnits="userSpaceOnUse">
+                <path
+                  d="M 20 0 L 0 0 0 20"
+                  fill="none"
+                  stroke={isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.12)'}
+                />
+              </pattern>
+            </defs>
+            <rect width="100%" height="100%" fill="url(#preview-grid)" />
+          </svg>
+
+          {/* edges */}
+          <svg
+            className="pointer-events-none absolute inset-0 h-full w-full"
+            viewBox="0 0 100 100"
+            preserveAspectRatio="none"
+            aria-hidden
+          >
+            {s.edges.map((e, idx) => {
+              const a = nodeById[e.from];
+              const b = nodeById[e.to];
+              if (!a || !b) return null;
+              const ax = a.x + 6;
+              const ay = a.y + 5;
+              const bx = b.x + 6;
+              const by = b.y + 5;
+              const len = Math.hypot(bx - ax, by - ay) * 2;
+              return (
+                <line
+                  key={`${scene}-${idx}`}
+                  x1={ax}
+                  y1={ay}
+                  x2={bx}
+                  y2={by}
+                  stroke={isDark ? 'rgba(165,180,252,0.85)' : 'rgba(99,102,241,0.85)'}
+                  strokeWidth={0.5}
+                  className="edge-draw"
+                  style={{ ['--edge-len' as string]: String(len) }}
+                  strokeLinecap="round"
+                />
+              );
+            })}
+          </svg>
+
+          {/* nodes */}
+          {s.nodes.map((n, i) => (
+            <div
+              key={`${scene}-${n.id}`}
+              className="scene-enter absolute rounded-md border px-2 py-1 text-[10px] font-semibold shadow-sm backdrop-blur-sm sm:text-xs"
+              style={{
+                left: `${n.x}%`,
+                top: `${n.y}%`,
+                animationDelay: `${100 + i * 70}ms`,
+                borderColor: isDark ? `${n.color}66` : `${n.color}aa`,
+                background: isDark
+                  ? `linear-gradient(135deg, ${n.color}22, rgba(0,0,0,0.55))`
+                  : `linear-gradient(135deg, ${n.color}33, rgba(255,255,255,0.92))`,
+                color: isDark ? '#e2e8f0' : '#0f172a',
+                boxShadow: isDark ? `0 0 16px -8px ${n.color}` : `0 6px 16px -8px ${n.color}aa`,
+              }}
+            >
+              {n.label}
+            </div>
+          ))}
+        </div>
+
+        {/* caption */}
+        <div className="mt-3 flex items-center gap-2">
+          <div className="flex gap-1">
+            {PREVIEW_SCENES.map((_, i) => (
+              <span
+                key={i}
+                className={`h-1.5 rounded-full transition-all ${
+                  i === scene ? 'w-6 bg-indigo-500 dark:bg-indigo-400' : 'w-1.5 bg-slate-300 dark:bg-white/15'
+                }`}
+              />
+            ))}
+          </div>
+          <p className="text-[11px] leading-snug text-slate-600 dark:text-slate-400 sm:text-xs">{s.caption}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────────────── */
+/*  Tour overlay — used by the Try Demo button                                */
+/* ────────────────────────────────────────────────────────────────────────── */
+
+type TourAnchorKey = 'ai' | 'tabs' | 'narrative' | 'playbook' | 'export';
+
+interface TourStep {
+  anchor: TourAnchorKey;
+  title: string;
+  body: string;
+  durationMs: number;
+}
+
+const TOUR_STEPS: TourStep[] = [
+  {
+    anchor: 'ai',
+    title: 'Idea → architecture',
+    body:
+      'Describe a product here in plain English. One run fills the canvas, narrative, diagrams, and engineering playbook — no setup.',
+    durationMs: 7000,
+  },
+  {
+    anchor: 'tabs',
+    title: 'Diagram tabs cycle through the same product',
+    body:
+      'Tech Stack, Flowchart, DFD, Use Case, System Architecture, plus Mermaid SDLC and Workflow. Drag any node to recompose the layout.',
+    durationMs: 13000,
+  },
+  {
+    anchor: 'narrative',
+    title: 'Layer-by-layer narrative',
+    body:
+      'A summary plus rationale for Frontend, API, Data, Auth, and Infra — and a one-paragraph caption per diagram tab.',
+    durationMs: 7000,
+  },
+  {
+    anchor: 'playbook',
+    title: 'Engineering playbook',
+    body:
+      'SDLC method, workflow, requirements, quality, security, and platform notes — generated from the same brief.',
+    durationMs: 11000,
+  },
+  {
+    anchor: 'export',
+    title: 'Export PNG',
+    body: 'Any diagram tab can be exported as a high-resolution PNG for docs, decks, or PRs.',
+    durationMs: 6000,
+  },
+];
+
+interface TourOverlayProps {
+  step: TourStep;
+  rect: DOMRect | null;
+  index: number;
+  total: number;
+  onPrev: () => void;
+  onNext: () => void;
+  onClose: () => void;
+}
+
+function TourOverlay({ step, rect, index, total, onPrev, onNext, onClose }: TourOverlayProps) {
+  if (!rect) return null;
+  const padding = 8;
+  const ringStyle: React.CSSProperties = {
+    left: rect.left - padding,
+    top: rect.top - padding,
+    width: rect.width + padding * 2,
+    height: rect.height + padding * 2,
+  };
+
+  const tipWidth = 320;
+  const margin = 16;
+  const vw = typeof window !== 'undefined' ? window.innerWidth : 1024;
+  const vh = typeof window !== 'undefined' ? window.innerHeight : 768;
+
+  let tipLeft = rect.left + rect.width / 2 - tipWidth / 2;
+  tipLeft = Math.max(margin, Math.min(vw - tipWidth - margin, tipLeft));
+
+  const spaceBelow = vh - (rect.bottom + padding) - margin;
+  const placeBelow = spaceBelow > 180 || rect.top < 200;
+  const tipTop = placeBelow ? rect.bottom + padding + 12 : Math.max(margin, rect.top - padding - 12 - 220);
+
+  const isLast = index === total - 1;
+
+  return (
+    <>
+      <div
+        className="pointer-events-none fixed inset-0 z-[60] bg-slate-900/35 transition-colors dark:bg-black/55"
+        aria-hidden
+      />
+      <div
+        className="tour-ring pointer-events-none fixed z-[61] rounded-2xl ring-2 ring-indigo-400/80"
+        style={ringStyle}
+        aria-hidden
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={step.title}
+        className="fixed z-[62] w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-indigo-300/60 bg-white p-4 shadow-2xl dark:border-indigo-400/30 dark:bg-[#0f1320]"
+        style={{ left: tipLeft, top: tipTop, width: Math.min(tipWidth, vw - margin * 2) }}
+      >
+        <div className="mb-1 flex items-center justify-between">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
+            Demo · Step {index + 1} / {total}
+          </span>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md px-1.5 py-0.5 text-xs text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/10"
+            aria-label="Close demo"
+          >
+            ✕
+          </button>
+        </div>
+        <h3 className="mb-1 text-sm font-semibold text-slate-900 dark:text-white">{step.title}</h3>
+        <p className="mb-3 text-[12px] leading-relaxed text-slate-700 dark:text-slate-300">{step.body}</p>
+        <div className="flex items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-xs font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+          >
+            Skip tour
+          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onPrev}
+              disabled={index === 0}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-40 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
+            >
+              Back
+            </button>
+            <button
+              type="button"
+              onClick={onNext}
+              className="rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90"
+            >
+              {isLast ? 'Finish' : 'Next'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
 export default function App() {
   const [showStudio, setShowStudio] = useState(false);
   const [projectName, setProjectName] = useState('My Project');
@@ -631,9 +1259,17 @@ export default function App() {
   const [playbookTab, setPlaybookTab] = useState<PlaybookTabId>('sdlc');
   const [theme, setTheme] = useState<'light' | 'dark'>(readStoredTheme);
 
+  const [tourStep, setTourStep] = useState<number>(-1);
+  const [tourRect, setTourRect] = useState<DOMRect | null>(null);
+
   const canvasRef = useRef<HTMLDivElement>(null);
   const graphRef = useRef<HTMLDivElement>(null);
   const nodeElRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const tourAiRef = useRef<HTMLDivElement>(null);
+  const tourTabsRef = useRef<HTMLDivElement>(null);
+  const tourNarrativeRef = useRef<HTMLDivElement>(null);
+  const tourPlaybookRef = useRef<HTMLDivElement>(null);
+  const tourExportRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark');
@@ -646,6 +1282,109 @@ export default function App() {
 
   const isDark = theme === 'dark';
   const toggleTheme = () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'));
+
+  const tourActive = tourStep >= 0 && tourStep < TOUR_STEPS.length;
+  const currentTourStep = tourActive ? TOUR_STEPS[tourStep] : null;
+
+  const tourAnchorRefs = useMemo<Record<TourAnchorKey, React.RefObject<HTMLElement | null>>>(
+    () => ({
+      ai: tourAiRef,
+      tabs: tourTabsRef,
+      narrative: tourNarrativeRef,
+      playbook: tourPlaybookRef,
+      export: tourExportRef,
+    }),
+    []
+  );
+
+  // Track the current tour anchor's bounding rect via rAF while the tour is active.
+  useEffect(() => {
+    if (!currentTourStep) {
+      setTourRect(null);
+      return;
+    }
+    const ref = tourAnchorRefs[currentTourStep.anchor];
+    const el = ref.current;
+    if (!el) {
+      setTourRect(null);
+      return;
+    }
+    el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+    let rafId = 0;
+    const tick = () => {
+      const node = ref.current;
+      if (node) setTourRect(node.getBoundingClientRect());
+      rafId = window.requestAnimationFrame(tick);
+    };
+    rafId = window.requestAnimationFrame(tick);
+    return () => window.cancelAnimationFrame(rafId);
+  }, [currentTourStep, tourAnchorRefs]);
+
+  // Auto-advance the tour and run per-step side effects (cycling diagram + playbook tabs).
+  useEffect(() => {
+    if (!currentTourStep) return;
+    const cleanups: Array<() => void> = [];
+
+    if (currentTourStep.anchor === 'tabs') {
+      let i = 0;
+      setDiagramType(CANVAS_DIAGRAM_TYPES[0]);
+      const id = window.setInterval(() => {
+        i = (i + 1) % CANVAS_DIAGRAM_TYPES.length;
+        setDiagramType(CANVAS_DIAGRAM_TYPES[i]);
+      }, 1700);
+      cleanups.push(() => window.clearInterval(id));
+    } else if (currentTourStep.anchor === 'playbook') {
+      const order: PlaybookTabId[] = PLAYBOOK_TABS.map((t) => t.id);
+      let i = 0;
+      setPlaybookTab(order[0]);
+      const id = window.setInterval(() => {
+        i = (i + 1) % order.length;
+        setPlaybookTab(order[i]);
+      }, 1500);
+      cleanups.push(() => window.clearInterval(id));
+    } else if (currentTourStep.anchor === 'narrative') {
+      setDiagramType('Tech Stack');
+    }
+
+    const advanceId = window.setTimeout(() => {
+      setTourStep((s) => (s < TOUR_STEPS.length - 1 ? s + 1 : -1));
+    }, currentTourStep.durationMs);
+    cleanups.push(() => window.clearTimeout(advanceId));
+
+    return () => cleanups.forEach((fn) => fn());
+  }, [currentTourStep]);
+
+  // Allow Esc to exit the tour.
+  useEffect(() => {
+    if (!tourActive) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setTourStep(-1);
+      if (e.key === 'ArrowRight')
+        setTourStep((s) => (s < TOUR_STEPS.length - 1 ? s + 1 : -1));
+      if (e.key === 'ArrowLeft') setTourStep((s) => Math.max(0, s - 1));
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [tourActive]);
+
+  const loadDemo = () => {
+    setProjectName(DEMO_PROJECT_NAME);
+    setStack(DEMO_STACK);
+    setSystemIdea(DEMO_SYSTEM_IDEA);
+    setAiResult(DEMO_AI_RESULT);
+    setAiError('');
+    setArchitectureNarrative(DEMO_NARRATIVE);
+    setGeneratedDiagrams(DEMO_DIAGRAMS);
+    setGeneratedVisuals(DEMO_VISUALS);
+    setDevPlaybook(DEMO_PLAYBOOK);
+    setDiagramType('Tech Stack');
+    setDiagramTab('Flowchart');
+    setPlaybookTab('sdlc');
+    setNodePositions({});
+    setStakeholderMode(false);
+    setShowStudio(true);
+    window.setTimeout(() => setTourStep(0), 320);
+  };
 
   const nodes = useMemo(() => makeNodes(stack), [stack]);
   
@@ -1069,12 +1808,14 @@ export default function App() {
             </div>
             <div className="flex items-center gap-3">
               <div className="hidden text-sm text-slate-600 dark:text-slate-400 sm:block sm:text-right">
-                Architecture &amp; stack studio
+                Idea → stack, diagrams &amp; engineering playbook
               </div>
               <ThemeToggle theme={theme} onToggle={toggleTheme} />
             </div>
           </header>
-          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400 sm:hidden">Architecture &amp; stack studio</p>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400 sm:hidden">
+            Idea → stack, diagrams &amp; engineering playbook
+          </p>
 
           {/* Hero */}
           <main className="flex-1 flex items-center py-6 sm:py-10 lg:py-0">
@@ -1082,17 +1823,19 @@ export default function App() {
               <div className="min-w-0 lg:col-start-1 lg:row-start-1">
                 <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-indigo-200/80 bg-indigo-50 px-3 py-1 text-xs text-indigo-800 dark:border-indigo-500/20 dark:bg-indigo-500/10 dark:text-indigo-300 sm:mb-6 sm:text-sm">
                   <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-indigo-500 dark:bg-indigo-400" />
-                  AI-Powered Architecture
+                  Idea → architecture in one run
                 </div>
                 <h1 className="mb-5 text-3xl font-bold leading-[1.12] text-slate-900 sm:mb-6 sm:text-4xl sm:leading-tight md:text-5xl lg:text-6xl dark:text-white">
-                  Visualize your
+                  Describe the product.
                   <span className="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent dark:from-indigo-400 dark:to-purple-400">
                     {' '}
-                    tech stack
+                    Get the stack and diagrams.
                   </span>
                 </h1>
                 <p className="mb-6 max-w-lg text-base text-slate-600 sm:mb-8 sm:text-lg dark:text-slate-400">
-                  Create stunning architecture diagrams in seconds. Perfect for documentation, presentations, and team communication.
+                  Describe what you are building once. Nebula uses AI to propose a stack, write a layer-by-layer narrative, fill
+                  diagram tabs (flowchart, DFD, use case, system—plus Mermaid SDLC and workflow), and draft playbook notes from
+                  requirements through platform. Refine the interactive canvas, then export a PNG for specs or presentations.
                 </p>
                 <div className="flex flex-wrap gap-2 mb-6 sm:mb-8">
                   {DEFAULT_STACK.map(t => (
@@ -1115,39 +1858,33 @@ export default function App() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => { setStack(DEFAULT_STACK); setShowStudio(true); }}
-                    className="w-full touch-manipulation rounded-xl border border-slate-300 bg-white px-6 py-3 text-center font-semibold text-slate-800 transition hover:bg-slate-50 dark:border-white/20 dark:bg-transparent dark:text-white dark:hover:bg-white/5 sm:w-auto"
+                    onClick={loadDemo}
+                    className="group w-full touch-manipulation rounded-xl border border-slate-300 bg-white px-6 py-3 text-center font-semibold text-slate-800 transition hover:bg-slate-50 dark:border-white/20 dark:bg-transparent dark:text-white dark:hover:bg-white/5 sm:w-auto"
                   >
-                    Try Demo
+                    <span className="inline-flex items-center gap-2">
+                      <span aria-hidden className="relative flex h-2.5 w-2.5">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-indigo-400 opacity-75" />
+                        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-indigo-500" />
+                      </span>
+                      Try Demo (guided tour)
+                    </span>
                   </button>
                 </div>
               </div>
 
               <div className="hidden lg:block lg:col-start-2 lg:row-start-1 min-w-0">
-                <div className="relative">
-                  <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 rounded-2xl blur-xl" />
-                  <div className="relative rounded-2xl border border-slate-200/80 bg-white/70 p-6 backdrop-blur-xl dark:border-white/10 dark:bg-black/40">
-                    <div className="flex gap-2 mb-4">
-                      <div className="w-3 h-3 rounded-full bg-red-400/60" />
-                      <div className="w-3 h-3 rounded-full bg-yellow-400/60" />
-                      <div className="w-3 h-3 rounded-full bg-green-400/60" />
-                    </div>
-                    <div className="space-y-3">
-                      {['Drag-and-drop canvas', 'AI stack suggestions', 'Multiple diagram types', 'Export to PNG'].map(f => (
-                        <div key={f} className="flex items-center gap-3 rounded-lg bg-slate-100/80 p-3 dark:bg-white/5">
-                          <span className="text-indigo-600 dark:text-indigo-400">✓</span>
-                          <span className="text-sm text-slate-700 dark:text-slate-300">{f}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
+                <LandingPreview theme={theme} />
               </div>
 
               <div className="rounded-2xl border border-slate-200/80 bg-white/60 p-4 backdrop-blur-md dark:border-white/10 dark:bg-black/30 sm:p-5 lg:hidden lg:col-span-2">
                 <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-700">Included</div>
                 <ul className="space-y-2 text-sm text-slate-700 dark:text-slate-300">
-                  {['Drag-and-drop canvas', 'AI stack suggestions', 'Diagram types', 'Export to PNG'].map((f) => (
+                  {[
+                    'Idea → architecture AI',
+                    'Stack + diagram canvas tabs',
+                    'Engineering playbook',
+                    'Export PNG',
+                  ].map((f) => (
                     <li key={f} className="flex items-center gap-2">
                       <span className="shrink-0 text-indigo-600 dark:text-indigo-400">✓</span>
                       {f}
@@ -1159,7 +1896,7 @@ export default function App() {
           </main>
 
           <footer className="border-t border-slate-200/80 pt-8 text-center text-xs text-slate-600 dark:border-white/5 dark:text-slate-500 sm:text-sm">
-            Nebula · built for developers who present to humans
+            Nebula · architecture sketches from a brief, ready to share
           </footer>
         </div>
       </div>
@@ -1210,6 +1947,7 @@ export default function App() {
             </span>
             <ThemeToggle theme={theme} onToggle={toggleTheme} />
             <button
+              ref={tourExportRef}
               type="button"
               onClick={exportPng}
               disabled={isExporting}
@@ -1227,7 +1965,10 @@ export default function App() {
             className="col-span-12 overflow-hidden rounded-2xl border border-slate-200/90 bg-white/80 backdrop-blur-xl dark:border-white/10 dark:bg-black/30 lg:col-span-9"
           >
             {/* Diagram Tabs */}
-            <div className="-mx-px flex touch-pan-x gap-1 overflow-x-auto overflow-y-hidden border-b border-slate-200/80 bg-slate-100/80 p-2 scrollbar-thin dark:border-white/5 dark:bg-black/20">
+            <div
+              ref={tourTabsRef}
+              className="-mx-px flex touch-pan-x gap-1 overflow-x-auto overflow-y-hidden border-b border-slate-200/80 bg-slate-100/80 p-2 scrollbar-thin dark:border-white/5 dark:bg-black/20"
+            >
               {CANVAS_DIAGRAM_TYPES.map((type) => (
                 <button
                   type="button"
@@ -1636,7 +2377,10 @@ export default function App() {
             </div>
 
             {/* AI Generator */}
-            <div className="rounded-xl border border-slate-200/90 bg-white/80 p-4 backdrop-blur-xl dark:border-white/10 dark:bg-black/30">
+            <div
+              ref={tourAiRef}
+              className="rounded-xl border border-slate-200/90 bg-white/80 p-4 backdrop-blur-xl dark:border-white/10 dark:bg-black/30"
+            >
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
                   <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -1703,7 +2447,10 @@ export default function App() {
             </div>
 
             {/* Narrative */}
-            <div className="col-span-12 rounded-xl border border-slate-200/90 bg-white/80 p-4 backdrop-blur-xl dark:border-white/10 dark:bg-black/30 lg:col-span-8">
+            <div
+              ref={tourNarrativeRef}
+              className="col-span-12 rounded-xl border border-slate-200/90 bg-white/80 p-4 backdrop-blur-xl dark:border-white/10 dark:bg-black/30 lg:col-span-8"
+            >
               <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-500">
                 Architecture Narrative
               </div>
@@ -1833,7 +2580,10 @@ export default function App() {
           </div>
 
           {/* Engineering playbook: SDLC, workflow, and delivery tabs */}
-          <div className="col-span-12 rounded-xl border border-slate-200/90 bg-white/80 p-4 backdrop-blur-xl dark:border-white/10 dark:bg-black/30">
+          <div
+            ref={tourPlaybookRef}
+            className="col-span-12 rounded-xl border border-slate-200/90 bg-white/80 p-4 backdrop-blur-xl dark:border-white/10 dark:bg-black/30"
+          >
             <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-500">
               Engineering playbook
             </div>
@@ -1989,6 +2739,20 @@ export default function App() {
           )}
         </div>
       </div>
+
+      {tourActive && currentTourStep ? (
+        <TourOverlay
+          step={currentTourStep}
+          rect={tourRect}
+          index={tourStep}
+          total={TOUR_STEPS.length}
+          onPrev={() => setTourStep((s) => Math.max(0, s - 1))}
+          onNext={() =>
+            setTourStep((s) => (s < TOUR_STEPS.length - 1 ? s + 1 : -1))
+          }
+          onClose={() => setTourStep(-1)}
+        />
+      ) : null}
     </div>
   );
 }
