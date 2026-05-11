@@ -1,10 +1,29 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toPng } from 'html-to-image';
 import { buildArchitecturePrompt, fetchArchitectureCompletionText } from './architectureCompletion';
+import { MermaidBlock } from './MermaidBlock';
 
 type TechLayer = 'Frontend' | 'API' | 'Data' | 'Auth' | 'Infra';
 type ViewMode = 'Signal Path' | 'Blueprint' | 'Briefing';
-type DiagramType = 'Tech Stack' | 'Flowchart' | 'DFD' | 'Use Case' | 'System Architecture';
+type DiagramType =
+  | 'Tech Stack'
+  | 'Flowchart'
+  | 'DFD'
+  | 'Use Case'
+  | 'System Architecture'
+  | 'SDLC'
+  | 'Workflow';
+
+/** Order of tabs in the main canvas diagram strip */
+const CANVAS_DIAGRAM_TYPES: DiagramType[] = [
+  'Tech Stack',
+  'Flowchart',
+  'DFD',
+  'Use Case',
+  'System Architecture',
+  'SDLC',
+  'Workflow',
+];
 
 interface TechNode {
   id: string;
@@ -71,6 +90,8 @@ interface SdlcPlan {
   rationale: string;
   cadenceAndCeremonies: string;
   whenToRevisit: string;
+  /** Mermaid flowchart source rendered in the playbook */
+  diagram: string;
 }
 
 /** Git, CI/CD, collaboration, releases */
@@ -79,6 +100,8 @@ interface WorkflowPlan {
   ciCd: string;
   collaboration: string;
   releaseAndRollback: string;
+  /** Mermaid flowchart source rendered in the playbook */
+  diagram: string;
 }
 
 interface RequirementsPlan {
@@ -224,8 +247,8 @@ const DIAGRAM_NARRATIVE_ORDER: { key: keyof DiagramProcessNarratives; label: str
 ];
 
 const PLAYBOOK_TABS: { id: PlaybookTabId; label: string; shortLabel?: string; hint: string }[] = [
-  { id: 'sdlc', label: 'SDLC', hint: 'Methodology, cadence, and when to revisit process choices.' },
-  { id: 'workflow', label: 'Workflow', shortLabel: 'Flow', hint: 'Branching, CI/CD, collaboration, releases.' },
+  { id: 'sdlc', label: 'SDLC', hint: 'Methodology narrative — open the SDLC tab on the canvas for the diagram.' },
+  { id: 'workflow', label: 'Workflow', shortLabel: 'Flow', hint: 'Shipping narrative — open the Workflow canvas tab for the diagram.' },
   { id: 'requirements', label: 'Requirements', shortLabel: 'Reqs', hint: 'Scope, NFRs, integrations and contracts.' },
   { id: 'quality', label: 'Quality', hint: 'Testing strategy, environments, definition of done.' },
   { id: 'security', label: 'Security', hint: 'Auth, data, secrets, supply chain, compliance.' },
@@ -250,12 +273,14 @@ function parseDevPlaybook(parsed: AiGeneratePayload): DevPlaybook | null {
     rationale: strField(s, 'rationale'),
     cadenceAndCeremonies: strField(s, 'cadenceAndCeremonies'),
     whenToRevisit: strField(s, 'whenToRevisit'),
+    diagram: strField(s, 'diagram'),
   };
   const workflow: WorkflowPlan = {
     gitBranching: strField(w, 'gitBranching'),
     ciCd: strField(w, 'ciCd'),
     collaboration: strField(w, 'collaboration'),
     releaseAndRollback: strField(w, 'releaseAndRollback'),
+    diagram: strField(w, 'diagram'),
   };
   const requirements: RequirementsPlan = {
     scopeAndMvp: strField(r, 'scopeAndMvp'),
@@ -646,6 +671,15 @@ export default function App() {
     return null;
   }, [diagramType]);
 
+  const isPlaybookMermaidCanvas = diagramType === 'SDLC' || diagramType === 'Workflow';
+
+  const playbookCanvasChart = useMemo(() => {
+    if (!devPlaybook) return '';
+    if (diagramType === 'SDLC') return devPlaybook.sdlc.diagram.trim();
+    if (diagramType === 'Workflow') return devPlaybook.workflow.diagram.trim();
+    return '';
+  }, [diagramType, devPlaybook]);
+
   const visualNodeColor = (kind: string): string => {
     const key = kind.toLowerCase();
     if (key.includes('actor') || key.includes('user')) return '#fbbf24';
@@ -662,6 +696,9 @@ export default function App() {
   }, [diagramKey, generatedVisuals]);
 
   const canvasNodes = useMemo(() => {
+    if (diagramType === 'SDLC' || diagramType === 'Workflow') {
+      return [];
+    }
     if (diagramType === 'Tech Stack') {
       return nodes.map((node) => ({
         id: node.id,
@@ -703,6 +740,9 @@ export default function App() {
   }, [diagramType, generatedVisuals, architectureNarrative?.headline, projectName]);
 
   const canvasEdges = useMemo(() => {
+    if (diagramType === 'SDLC' || diagramType === 'Workflow') {
+      return [];
+    }
     if (diagramType === 'Tech Stack') {
       return nodes.slice(0, -1).map((node, i) => ({
         from: node.id,
@@ -1188,7 +1228,7 @@ export default function App() {
           >
             {/* Diagram Tabs */}
             <div className="-mx-px flex touch-pan-x gap-1 overflow-x-auto overflow-y-hidden border-b border-slate-200/80 bg-slate-100/80 p-2 scrollbar-thin dark:border-white/5 dark:bg-black/20">
-              {(['Tech Stack', 'Flowchart', 'DFD', 'Use Case', 'System Architecture'] as DiagramType[]).map(type => (
+              {CANVAS_DIAGRAM_TYPES.map((type) => (
                 <button
                   type="button"
                   key={type}
@@ -1200,7 +1240,8 @@ export default function App() {
                   }`}
                 >
                   {type === 'System Architecture' ? <span className="sm:hidden">Sys arch</span> : null}
-                  {type === 'System Architecture' ? <span className="hidden sm:inline">{type}</span> : type}
+                  {type === 'System Architecture' ? <span className="hidden sm:inline">{type}</span> : null}
+                  {type !== 'System Architecture' ? type : null}
                 </button>
               ))}
             </div>
@@ -1208,10 +1249,51 @@ export default function App() {
             {/* Canvas */}
             <div
               ref={graphRef}
-              className="relative min-h-[260px] h-[min(720px,max(260px,calc(100svh-15.5rem)))] sm:h-[min(620px,max(340px,calc(100svh-14rem)))] lg:h-[720px] touch-none select-none"
+              className={`relative min-h-[260px] h-[min(720px,max(260px,calc(100svh-15.5rem)))] sm:h-[min(620px,max(340px,calc(100svh-14rem)))] lg:h-[720px] ${
+                isPlaybookMermaidCanvas ? 'touch-auto select-text' : 'touch-none select-none'
+              }`}
               onPointerMove={onPointerMove}
               onPointerUp={() => setDraggingId(null)}
             >
+              {isPlaybookMermaidCanvas ? (
+                <div className="absolute inset-0 z-[5] overflow-auto overscroll-contain p-3 sm:p-5">
+                  {!devPlaybook ? (
+                    <div className="flex min-h-[12rem] flex-col items-center justify-center gap-2 px-4 text-center text-sm text-slate-700 dark:text-slate-500">
+                      <span>Run Idea → architecture first — SDLC and Workflow diagrams come from that response.</span>
+                    </div>
+                  ) : !playbookCanvasChart ? (
+                    <div className="flex min-h-[12rem] flex-col items-center justify-center gap-2 px-4 text-center text-sm text-slate-700 dark:text-slate-500">
+                      <span>
+                        No Mermaid source for this view yet. Regenerate — the model should return{' '}
+                        <code className="rounded bg-slate-200/90 px-1 text-xs dark:bg-white/10">
+                          {diagramType === 'SDLC' ? 'sdlc.diagram' : 'workflow.diagram'}
+                        </code>
+                        .
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="mx-auto max-w-5xl space-y-3">
+                      {diagramType === 'SDLC' && devPlaybook.sdlc.method ? (
+                        <div className="inline-flex items-center gap-2 rounded-lg border border-violet-200/80 bg-violet-50/90 px-3 py-1.5 dark:border-violet-500/25 dark:bg-violet-500/10">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-violet-700 dark:text-violet-300/90">
+                            SDLC
+                          </span>
+                          <span className="text-sm font-semibold text-slate-900 dark:text-white">
+                            {devPlaybook.sdlc.method}
+                          </span>
+                        </div>
+                      ) : null}
+                      {diagramType === 'Workflow' ? (
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-500">
+                          Engineering workflow
+                        </div>
+                      ) : null}
+                      <MermaidBlock chart={playbookCanvasChart} theme={theme} />
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <>
               {/* Grid */}
               <svg className={`absolute inset-0 w-full h-full pointer-events-none ${canvasView.gridClass}`}>
                 <defs>
@@ -1428,6 +1510,8 @@ export default function App() {
                     </>
                   )}
                 </div>
+              )}
+                </>
               )}
             </div>
           </div>
@@ -1754,8 +1838,8 @@ export default function App() {
               Engineering playbook
             </div>
             <p className="mb-3 text-[11px] leading-snug text-slate-600 dark:text-slate-500">
-              Filled by the same AI run as your architecture: methodology, how you ship, requirements, quality gates, security, and
-              platform operations.
+              Filled by the same AI run as your architecture. SDLC and Workflow diagrams live in the main canvas tabs; this panel
+              adds narrative detail.
             </p>
             <div className="-mx-px flex gap-1 overflow-x-auto overflow-y-hidden border-b border-slate-200/80 pb-2 scrollbar-thin touch-pan-x dark:border-white/5">
               {PLAYBOOK_TABS.map(({ id, label, shortLabel, hint }) => (
@@ -1799,6 +1883,10 @@ export default function App() {
                     const m = devPlaybook.sdlc.method;
                     return (
                       <div className="space-y-3">
+                        <p className="text-[11px] leading-snug text-slate-600 dark:text-slate-500">
+                          Open the <span className="font-semibold text-slate-800 dark:text-slate-300">SDLC</span> tab above the
+                          canvas to view the lifecycle Mermaid diagram full size.
+                        </p>
                         {m ? (
                           <div className="inline-flex items-center gap-2 rounded-lg border border-violet-200/80 bg-violet-50/90 px-3 py-1.5 dark:border-violet-500/25 dark:bg-violet-500/10">
                             <span className="text-[10px] font-bold uppercase tracking-wider text-violet-700 dark:text-violet-300/90">
@@ -1816,6 +1904,10 @@ export default function App() {
                   if (playbookTab === 'workflow') {
                     return (
                       <div className="space-y-3">
+                        <p className="text-[11px] leading-snug text-slate-600 dark:text-slate-500">
+                          Open the <span className="font-semibold text-slate-800 dark:text-slate-300">Workflow</span> tab above the
+                          canvas for the delivery pipeline diagram.
+                        </p>
                         <Para label="Git & branching" body={devPlaybook.workflow.gitBranching} />
                         <Para label="CI / CD" body={devPlaybook.workflow.ciCd} />
                         <Para label="Collaboration" body={devPlaybook.workflow.collaboration} />

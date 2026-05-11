@@ -59,18 +59,25 @@ Output requirements (strict):
      "method": one concise label, e.g. "Scrum", "Kanban", "Scrumban", "Shape Up", "Waterfall (phase-gated)", "Hybrid",
      "rationale": 2–4 sentences why this SDLC fits THIS product (risk, compliance, speed, discovery vs delivery),
      "cadenceAndCeremonies": 2–4 sentences on sprint/iteration length, planning/review/retro if applicable, backlog hygiene,
-     "whenToRevisit": 1–2 sentences on signals to change methodology or tighten process
+     "whenToRevisit": 1–2 sentences on signals to change methodology or tighten process,
+     "diagram": REQUIRED valid Mermaid diagram (string) visualizing THIS SDLC for the product — NOT plain text.
+       Use flowchart TD or flowchart LR only.
+       Show phases/ceremonies/work products as nodes (e.g. Backlog refinement, Sprint planning, Build & test, Review, Retro, Release, Ops feedback) with arrows for sequence or iteration loops where appropriate.
+       8–16 nodes max; short ASCII labels (no quotes inside labels if possible, or use double quotes for node text); no HTML, no markdown fences inside the string.
+       Must be syntactically valid Mermaid the app can render as-is.
    }
-   All four keys must be non-empty strings.
+   All five keys must be non-empty strings.
 
 8) "workflow" (how engineers ship software day to day for THIS stack and product):
    {
      "gitBranching": 2–3 sentences (e.g. trunk-based, GitHub Flow, Git Flow) and why,
      "ciCd": 2–4 sentences on build, test, lint, preview deploys, production promotion,
      "collaboration": 2–3 sentences on PRs, code review, pairing/async, docs in repo,
-     "releaseAndRollback": 2–3 sentences on versioning, feature flags, migrations, rollback
+     "releaseAndRollback": 2–3 sentences on versioning, feature flags, migrations, rollback,
+     "diagram": REQUIRED valid Mermaid flowchart TD or LR visualizing the delivery pipeline for THIS product (branch → PR → review → CI → artifact → staging → production → monitor/rollback).
+       8–16 nodes max; short ASCII labels; no HTML; no markdown fences inside the string; syntactically valid Mermaid.
    }
-   All four keys must be non-empty strings.
+   All five keys must be non-empty strings.
 
 9) "requirements": product/engineering requirements lens for THIS system:
    {

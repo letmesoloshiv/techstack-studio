@@ -122,3 +122,11 @@ button:disabled {
 ::selection {
   background: rgba(99, 102, 241, 0.3);
 }
+
+/* Mermaid output in Engineering playbook (SDLC / Workflow tabs) */
+.playbook-mermaid svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin-inline: auto;
+}
