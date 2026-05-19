@@ -158,6 +158,9 @@ interface AiGeneratePayload {
 
 const DEFAULT_STACK = ['React', 'TypeScript', 'Tailwind CSS', 'Supabase', 'Vercel'];
 
+/** Tech shown on the landing page — what Nebula itself is built with */
+const APP_STACK = ['React', 'TypeScript', 'Tailwind CSS', 'Vite', 'Mermaid'] as const;
+
 const LAYER_COLORS: Record<TechLayer, string> = {
   Frontend: '#22d3ee',
   API: '#818cf8',
@@ -234,6 +237,7 @@ const TECH_ICON_SLUGS: Record<string, string> = {
   Cloudflare: 'cloudflare', Terraform: 'terraform', GitHub: 'github',
   Sentry: 'sentry', Stripe: 'stripe', Zod: 'zod', 'TanStack Query': 'reactquery',
   'NextAuth.js': 'shield',
+  Mermaid: 'mermaid',
 };
 
 const CATEGORY_ORDER: TechLayer[] = ['Frontend', 'API', 'Data', 'Auth', 'Infra'];
@@ -1982,42 +1986,31 @@ export default function App() {
               </div>
               <span className="text-xl font-bold">Nebula</span>
             </div>
-            <div className="flex items-center gap-3">
-              <div className="hidden text-sm text-slate-600 dark:text-slate-400 sm:block sm:text-right">
-                Idea → stack, diagrams &amp; engineering playbook
-              </div>
-              <ThemeToggle theme={theme} onToggle={toggleTheme} />
-            </div>
+            <ThemeToggle theme={theme} onToggle={toggleTheme} />
           </header>
-          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400 sm:hidden">
-            Idea → stack, diagrams &amp; engineering playbook
-          </p>
 
           {/* Hero */}
           <main className="flex-1 flex items-center py-6 sm:py-10 lg:py-0">
             <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center w-full">
               <div className="min-w-0 lg:col-start-1 lg:row-start-1">
-                <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-indigo-200/80 bg-indigo-50 px-3 py-1 text-xs text-indigo-800 dark:border-indigo-500/20 dark:bg-indigo-500/10 dark:text-indigo-300 sm:mb-6 sm:text-sm">
-                  <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-indigo-500 dark:bg-indigo-400" />
-                  Idea → architecture in one run
-                </div>
-                <h1 className="mb-5 text-3xl font-bold leading-[1.12] text-slate-900 sm:mb-6 sm:text-4xl sm:leading-tight md:text-5xl lg:text-6xl dark:text-white">
+                <h1 className="mb-4 text-3xl font-bold leading-[1.12] text-slate-900 sm:mb-5 sm:text-4xl sm:leading-tight md:text-5xl lg:text-6xl dark:text-white">
                   Describe the product.
                   <span className="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent dark:from-indigo-400 dark:to-purple-400">
                     {' '}
                     Get the stack and diagrams.
                   </span>
                 </h1>
-                <p className="mb-6 max-w-lg text-base text-slate-600 sm:mb-8 sm:text-lg dark:text-slate-400">
-                  Describe what you are building once. Nebula uses AI to propose a stack, write a layer-by-layer narrative, fill
-                  diagram tabs (flowchart, DFD, use case, system—plus Mermaid SDLC and workflow), and draft playbook notes from
-                  requirements through platform. Refine the interactive canvas, then export a PNG for specs or presentations.
+                <p className="mb-6 max-w-md text-base text-slate-600 sm:mb-7 dark:text-slate-400">
+                  One brief in — stack, diagrams, and engineering playbook out. Refine on the canvas, export PNG.
                 </p>
-                <div className="flex flex-wrap gap-2 mb-6 sm:mb-8">
-                  {DEFAULT_STACK.map(t => (
+                <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-slate-500 dark:text-slate-500">
+                  Built with
+                </p>
+                <div className="mb-7 flex flex-wrap gap-2 sm:mb-8">
+                  {APP_STACK.map((t) => (
                     <span
                       key={t}
-                      className="inline-flex min-w-0 max-w-full items-center gap-2 rounded-lg border border-slate-200/90 bg-white/80 px-2.5 py-1 text-xs shadow-sm dark:border-white/10 dark:bg-white/5 dark:shadow-none sm:px-3 sm:py-1.5 sm:text-sm"
+                      className="inline-flex min-w-0 max-w-full items-center gap-2 rounded-lg border border-slate-200/90 bg-white/80 px-2.5 py-1.5 text-xs text-slate-800 shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:shadow-none sm:px-3 sm:py-1.5 sm:text-sm"
                     >
                       <TechIcon name={t} theme={theme} className="h-4 w-4 shrink-0" />
                       <span className="truncate">{t}</span>
@@ -2042,7 +2035,7 @@ export default function App() {
                         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-indigo-400 opacity-75" />
                         <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-indigo-500" />
                       </span>
-                      Try Demo (guided tour)
+                      Try demo
                     </span>
                   </button>
                 </div>
@@ -2052,27 +2045,11 @@ export default function App() {
                 <LandingPreview theme={theme} />
               </div>
 
-              <div className="rounded-2xl border border-slate-200/80 bg-white/60 p-4 backdrop-blur-md dark:border-white/10 dark:bg-black/30 sm:p-5 lg:hidden lg:col-span-2">
-                <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-700">Included</div>
-                <ul className="space-y-2 text-sm text-slate-700 dark:text-slate-300">
-                  {[
-                    'Idea → architecture AI',
-                    'Stack + diagram canvas tabs',
-                    'Engineering playbook',
-                    'Export PNG',
-                  ].map((f) => (
-                    <li key={f} className="flex items-center gap-2">
-                      <span className="shrink-0 text-indigo-600 dark:text-indigo-400">✓</span>
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-              </div>
             </div>
           </main>
 
           <footer className="border-t border-slate-200/80 pt-8 text-center text-xs text-slate-600 dark:border-white/5 dark:text-slate-500 sm:text-sm">
-            Nebula · architecture sketches from a brief, ready to share
+            Nebula · brief in, architecture out
           </footer>
         </div>
       </div>
